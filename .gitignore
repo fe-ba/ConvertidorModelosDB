@@ -1,0 +1,11 @@
+# git ignore generico, modificar a gusto
+
+bin/
+*.class
+*.eap.bak
+*.qea.bak
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
