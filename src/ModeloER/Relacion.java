@@ -79,4 +79,12 @@ public class Relacion extends ElementoDelModelo {
     public void quitarParticipacion(String entidad) {
         participaciones.removeIf(p -> p.getEntidad().equals(entidad));
     }
+
+    /**
+     * Una relación no almacena atributos como columnas propias.
+     */
+    @Override
+    public List<Atributo> atributosAlmacenables() {
+        return Collections.emptyList();
+    }
 }
