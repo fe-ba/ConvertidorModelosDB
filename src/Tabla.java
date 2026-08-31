@@ -149,7 +149,7 @@ public class Tabla {
      */
     public Restriccion restringir(Restriccion restriccion) {
         if (restriccion == null) {
-            throw new IllegalArgumentException("La restricción no puede ser nula.");0
+            throw new IllegalArgumentException("La restricción no puede ser nula.");
         }
         restricciones.add(restriccion);
         return restriccion;
