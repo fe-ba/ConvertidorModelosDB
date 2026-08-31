@@ -73,7 +73,7 @@ public class Tabla {
         if (primaria() != null) {
             throw new IllegalStateException("La tabla " + nombre + " ya tiene una clave primaria definida.");
         }
-        Restriccion clave = new Restriccion(TipoRestriccion.PRIMARIA, nombresColumnas, null, null, null, null);
+        Restriccion clave = Restriccion.clave(TipoRestriccion.PRIMARIA, nombresColumnas);
         return restringir(clave);
     }
 

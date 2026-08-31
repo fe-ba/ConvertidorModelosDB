@@ -1,4 +1,7 @@
-
+/**
+ * Identifica qué regla de conversión de Entidad-Relación a relacional se
+ * aplicó para producir una parte del esquema (usado en {@link Traza}).
+ */
 public enum TipoRegla {
     ENTIDAD_FUERTE,
     ENTIDAD_DEBIL,
