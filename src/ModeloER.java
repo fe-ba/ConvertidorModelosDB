@@ -75,6 +75,19 @@ public class ModeloER {
         return buscarRelacion(nombre);
     }
 
+    /**
+     * Devuelve la entidad que posee el atributo indicado, o {@code null}
+     * si ningún atributo del modelo lleva ese nombre.
+     */
+    public Entidad propiedadDe(String nombreAtributo) {
+        for (Entidad entidad : entidades) {
+            if (entidad.buscarAtributo(nombreAtributo) != null) {
+                return entidad;
+            }
+        }
+        return null;
+    }
+
     public List<Entidad> getEntidades() {
         return Collections.unmodifiableList(entidades);
     }
