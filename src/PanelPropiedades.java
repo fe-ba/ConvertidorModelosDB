@@ -9,6 +9,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -17,26 +18,23 @@ import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-// Cuatro caras segun la seleccion: nada, un nodo, varios o un enlace. Se reconstruye entero.
+// Cuatro caras segun la seleccion: nada, una figura, varias o un enlace.
+// Se reconstruye entero cada vez que cambia, para no dejar estados a medias.
 public class PanelPropiedades extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
-    private transient Tablero tablero;
-    private transient LienzoER lienzo;
+    private final transient Tablero tablero;
+    private final transient LienzoER lienzo;
 
     public PanelPropiedades(LienzoER lienzo) {
         this.lienzo = lienzo;
         this.tablero = lienzo.getTablero();
         setLayout(new BorderLayout());
-        setPreferredSize(new Dimension(270, 0));
+        setPreferredSize(new Dimension(280, 0));
         setBackground(Tema.PANEL);
         setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
-        tablero.alCambiar(new Runnable() {
-            public void run() {
-                reconstruir();
-            }
-        });
+        tablero.alCambiar(this::reconstruir);
         reconstruir();
     }
 
@@ -47,7 +45,7 @@ public class PanelPropiedades extends JPanel {
         } else if (tablero.getSeleccionados().size() > 1) {
             construirParaVarios();
         } else if (tablero.getSeleccionado() != null) {
-            construirParaNodo(tablero.getSeleccionado());
+            construirParaFigura(tablero.getSeleccionado());
         } else {
             construirVacio();
         }
@@ -56,12 +54,14 @@ public class PanelPropiedades extends JPanel {
     }
 
     // --- Las cuatro caras ---
+
     private void construirVacio() {
         add(titulo("Nada seleccionado"), BorderLayout.NORTH);
         add(ayuda("Arrastra un simbolo desde la paleta.<br><br>"
-                + "Arrastra sobre el fondo para seleccionar varios a la vez, o "
-                + "haz clic con Ctrl para irlos sumando.<br><br>"
-                + "La rueda del raton acerca y aleja."), BorderLayout.CENTER);
+                + "Arrastra sobre el fondo para seleccionar varios, o haz clic con "
+                + "Ctrl para irlos sumando.<br><br>"
+                + "Para enlazar, selecciona una relacion y tira del asa hasta una "
+                + "entidad."), BorderLayout.CENTER);
     }
 
     private void construirParaVarios() {
@@ -72,60 +72,157 @@ public class PanelPropiedades extends JPanel {
         add(botonEliminar("Eliminar los " + cuantos), BorderLayout.SOUTH);
     }
 
-    // Un enlace solo se puede borrar.
+    // Un enlace es una participacion: aqui se le ponen cardinalidad y modalidad.
     private void construirParaEnlace() {
-        Enlace enlace = tablero.getEnlaceSeleccionado();
-        add(titulo("Enlace"), BorderLayout.NORTH);
-        add(ayuda(enlace.getOrigen().getNombre() + "  &mdash;  "
-                + enlace.getDestino().getNombre()), BorderLayout.CENTER);
-        add(botonEliminar("Eliminar enlace"), BorderLayout.SOUTH);
-    }
+        EnlaceVista enlace = tablero.getEnlaceSeleccionado();
+        add(titulo("Participacion"), BorderLayout.NORTH);
 
-    private void construirParaNodo(NodoVista nodo) {
-        add(titulo(nodo.getTipo().toString()), BorderLayout.NORTH);
-
-        // Los escuchadores van despues de fijar los valores: sin banderas ni disparos en cadena.
-        JTextField campoNombre = new JTextField(nodo.getNombre());
-        campoNombre.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) {
-                renombrar(nodo, campoNombre.getText());
-            }
-
-            public void removeUpdate(DocumentEvent e) {
-                renombrar(nodo, campoNombre.getText());
-            }
-
-            public void changedUpdate(DocumentEvent e) {
-                renombrar(nodo, campoNombre.getText());
-            }
+        JComboBox<Cardinalidad> cardinalidad =
+                new JComboBox<>(Cardinalidad.values());
+        cardinalidad.setSelectedItem(enlace.getParte().getCardinalidad());
+        cardinalidad.addActionListener(e -> {
+            enlace.getParte().setCardinalidad(
+                    (Cardinalidad) cardinalidad.getSelectedItem());
+            tablero.avisar();
         });
 
-        JComboBox<TipoNodo> selectorTipo = new JComboBox<TipoNodo>(TipoNodo.values());
-        selectorTipo.setSelectedItem(nodo.getTipo());
-        selectorTipo.addActionListener(e -> {
-            nodo.setTipo((TipoNodo) selectorTipo.getSelectedItem());
-            lienzo.repaint();
+        JComboBox<Modalidad> modalidad = new JComboBox<>(Modalidad.values());
+        modalidad.setSelectedItem(enlace.getParte().getModalidad());
+        modalidad.addActionListener(e -> {
+            enlace.getParte().setModalidad((Modalidad) modalidad.getSelectedItem());
+            tablero.avisar();
         });
 
         JPanel formulario = new JPanel(new GridLayout(0, 1, 0, 4));
         formulario.setOpaque(false);
+        formulario.add(rotulo(enlace.getRelacion().getNombre() + "  -  "
+                + enlace.getEntidad().getNombre()));
+        formulario.add(Box.createVerticalStrut(8));
+        formulario.add(rotulo("Cardinalidad"));
+        formulario.add(cardinalidad);
+        formulario.add(Box.createVerticalStrut(8));
+        formulario.add(rotulo("Participacion"));
+        formulario.add(modalidad);
+
+        add(arriba(formulario), BorderLayout.CENTER);
+        add(botonEliminar("Quitar la participacion"), BorderLayout.SOUTH);
+    }
+
+    private void construirParaFigura(Figura figura) {
+        add(titulo(nombreDelTipo(figura)), BorderLayout.NORTH);
+
+        JPanel formulario = new JPanel(new GridLayout(0, 1, 0, 4));
+        formulario.setOpaque(false);
         formulario.add(rotulo("Nombre"));
-        formulario.add(campoNombre);
+        formulario.add(campoNombre(figura));
         formulario.add(Box.createVerticalStrut(8));
         formulario.add(rotulo("Tipo"));
-        formulario.add(selectorTipo);
+        formulario.add(selectorDeTipo(figura));
+
+        if (figura.esAtributo()) {
+            agregarCamposDeAtributo(formulario, (Atributo) figura.getElemento());
+        }
 
         JPanel centro = new JPanel(new BorderLayout(0, 12));
         centro.setOpaque(false);
         centro.add(formulario, BorderLayout.NORTH);
-        centro.add(listaDeRelaciones(nodo), BorderLayout.CENTER);
+        centro.add(listaDeRelaciones(figura), BorderLayout.CENTER);
 
         add(centro, BorderLayout.CENTER);
         add(botonEliminar("Eliminar elemento"), BorderLayout.SOUTH);
     }
 
+    // --- Piezas del formulario ---
+
+    private JTextField campoNombre(Figura figura) {
+        JTextField campo = new JTextField(figura.getNombre());
+        campo.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) {
+                renombrar(figura, campo.getText());
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                renombrar(figura, campo.getText());
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                renombrar(figura, campo.getText());
+            }
+        });
+        return campo;
+    }
+
+    // Solo se ofrecen las variantes de la misma familia: una entidad no puede
+    // convertirse en relacion, son clases distintas del modelo.
+    private JComboBox<TipoNodo> selectorDeTipo(Figura figura) {
+        TipoNodo[] opciones;
+        if (figura.esEntidad()) {
+            opciones = new TipoNodo[] {TipoNodo.ENTIDAD, TipoNodo.ENTIDAD_DEBIL};
+        } else if (figura.esRelacion()) {
+            opciones = new TipoNodo[] {TipoNodo.RELACION,
+                    TipoNodo.RELACION_IDENTIFICADORA};
+        } else {
+            opciones = new TipoNodo[] {TipoNodo.ATRIBUTO, TipoNodo.ATRIBUTO_CLAVE};
+        }
+        JComboBox<TipoNodo> selector = new JComboBox<>(opciones);
+        selector.setSelectedItem(figura.getTipo());
+        selector.addActionListener(e ->
+                cambiarTipo(figura, (TipoNodo) selector.getSelectedItem()));
+        return selector;
+    }
+
+    private void cambiarTipo(Figura figura, TipoNodo tipo) {
+        ElementoDelModelo elemento = figura.getElemento();
+        if (elemento instanceof Entidad) {
+            ((Entidad) elemento).setDebil(tipo == TipoNodo.ENTIDAD_DEBIL);
+        } else if (elemento instanceof Relacion) {
+            ((Relacion) elemento).setIdentificadora(
+                    tipo == TipoNodo.RELACION_IDENTIFICADORA);
+        } else {
+            ((Atributo) elemento).marcar(Marca.CLAVE, tipo == TipoNodo.ATRIBUTO_CLAVE);
+        }
+        lienzo.repaint();
+    }
+
+    private void agregarCamposDeAtributo(JPanel formulario, Atributo atributo) {
+        formulario.add(Box.createVerticalStrut(8));
+        formulario.add(rotulo("Tipo de dato"));
+        JComboBox<TipoDato> tipos = new JComboBox<>(TipoDato.values());
+        tipos.setSelectedItem(atributo.getTipo());
+        tipos.addActionListener(e -> {
+            atributo.setTipo((TipoDato) tipos.getSelectedItem());
+            lienzo.repaint();
+        });
+        formulario.add(tipos);
+
+        formulario.add(Box.createVerticalStrut(8));
+        formulario.add(rotulo("Naturaleza"));
+        JComboBox<Naturaleza> naturaleza = new JComboBox<>(Naturaleza.values());
+        naturaleza.setSelectedItem(atributo.getNaturaleza());
+        naturaleza.addActionListener(e -> {
+            atributo.setNaturaleza((Naturaleza) naturaleza.getSelectedItem());
+            lienzo.repaint();
+        });
+        formulario.add(naturaleza);
+
+        formulario.add(Box.createVerticalStrut(8));
+        formulario.add(rotulo("Restricciones"));
+        for (Marca marca : Marca.values()) {
+            JCheckBox casilla = new JCheckBox(marca.name().toLowerCase(),
+                    atributo.getMarcas().contains(marca));
+            casilla.setForeground(Tema.TENUE);
+            casilla.setOpaque(false);
+            casilla.addActionListener(e -> {
+                atributo.marcar(marca, casilla.isSelected());
+                tablero.avisar();
+            });
+            formulario.add(casilla);
+        }
+    }
+
     // --- Lista de relaciones ---
-    private JPanel listaDeRelaciones(NodoVista nodo) {
+
+    private JPanel listaDeRelaciones(Figura figura) {
         JPanel caja = new JPanel(new BorderLayout(0, 4));
         caja.setOpaque(false);
         caja.add(rotulo("Relaciones"), BorderLayout.NORTH);
@@ -134,30 +231,33 @@ public class PanelPropiedades extends JPanel {
         filas.setLayout(new BoxLayout(filas, BoxLayout.Y_AXIS));
         filas.setOpaque(false);
 
-        List<Enlace> suyos = tablero.enlacesDe(nodo);
-        List<NodoVista> atributos = tablero.atributosDe(nodo);
-        boolean tienePadre = (nodo.getPadre() != null);
+        List<EnlaceVista> enlaces = tablero.enlacesDe(figura);
+        List<Figura> atributos = tablero.atributosDe(figura);
+        boolean tieneDuenno = figura.esAtributo();
 
-        if (suyos.isEmpty() && atributos.isEmpty() && !tienePadre) {
+        if (enlaces.isEmpty() && atributos.isEmpty() && !tieneDuenno) {
             JLabel ninguna = new JLabel("Sin relaciones todavia");
             ninguna.setForeground(Tema.TENUE);
             ninguna.setFont(Tema.MENUDA);
             ninguna.setAlignmentX(Component.LEFT_ALIGNMENT);
             filas.add(ninguna);
         }
-        for (Enlace enlace : suyos) {
-            filas.add(fila(tablero.otroExtremo(enlace, nodo).getNombre(), "enlace",
-                    "Quitar este enlace", e -> tablero.eliminarEnlace(enlace)));
+        for (EnlaceVista enlace : enlaces) {
+            String otro = tablero.otroExtremo(enlace, figura).getNombre();
+            String clase = enlace.getParte().getCardinalidad() == Cardinalidad.UNO
+                    ? "1" : "N";
+            filas.add(fila(otro, clase, "Quitar esta participacion",
+                    e -> tablero.eliminarEnlace(enlace)));
             filas.add(Box.createVerticalStrut(4));
         }
-        for (NodoVista atributo : atributos) {
-            filas.add(fila(atributo.getNombre(), "atributo",
-                    "Eliminar este atributo", e -> tablero.eliminarNodo(atributo)));
+        for (Figura atributo : atributos) {
+            filas.add(fila(atributo.getNombre(), "atributo", "Eliminar este atributo",
+                    e -> tablero.eliminar(List.of(atributo))));
             filas.add(Box.createVerticalStrut(4));
         }
-        if (tienePadre) {
+        if (tieneDuenno) {
             // sin equis: un atributo sin duenno no significa nada
-            filas.add(fila(nodo.getPadre().getNombre(), "duenno", null, null));
+            filas.add(fila(figura.getDuenno().getNombre(), "duenno", null, null));
             filas.add(Box.createVerticalStrut(4));
         }
 
@@ -169,7 +269,7 @@ public class PanelPropiedades extends JPanel {
         return caja;
     }
 
-    // La clase dice que union es; si la accion es nula, no se dibuja la equis.
+    // La clase dice de que union se trata; sin accion no se dibuja la equis.
     private JPanel fila(String nombre, String clase, String consejo,
                         ActionListener accion) {
         JPanel fila = new JPanel(new BorderLayout(6, 0));
@@ -203,37 +303,65 @@ public class PanelPropiedades extends JPanel {
     }
 
     // --- Piezas comunes ---
+
+    private String nombreDelTipo(Figura figura) {
+        if (figura.esEntidad()) {
+            return ((Entidad) figura.getElemento()).esDebil()
+                    ? "Entidad debil" : "Entidad";
+        }
+        if (figura.esRelacion()) {
+            return ((Relacion) figura.getElemento()).esIdentificadora()
+                    ? "Relacion identificadora" : "Relacion";
+        }
+        return "Atributo";
+    }
+
+    private JPanel arriba(JPanel contenido) {
+        JPanel envoltura = new JPanel(new BorderLayout());
+        envoltura.setOpaque(false);
+        envoltura.add(contenido, BorderLayout.NORTH);
+        return envoltura;
+    }
+
     private JLabel titulo(String texto) {
-        JLabel l = new JLabel(texto);
-        l.setForeground(Tema.TENUE);
-        l.setFont(l.getFont().deriveFont(Font.BOLD, 11f));
-        l.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-        return l;
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setForeground(Tema.TENUE);
+        etiqueta.setFont(etiqueta.getFont().deriveFont(Font.BOLD, 11f));
+        etiqueta.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        return etiqueta;
     }
 
     private JLabel rotulo(String texto) {
-        JLabel l = new JLabel(texto);
-        l.setForeground(Tema.TENUE);
-        return l;
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setForeground(Tema.TENUE);
+        return etiqueta;
     }
 
     private JLabel ayuda(String html) {
-        JLabel l = new JLabel("<html><body style='width:220px'>" + html + "</body></html>");
-        l.setForeground(Tema.TENUE);
-        l.setVerticalAlignment(JLabel.TOP);
-        return l;
+        JLabel etiqueta = new JLabel("<html><body style='width:220px'>"
+                + html + "</body></html>");
+        etiqueta.setForeground(Tema.TENUE);
+        etiqueta.setVerticalAlignment(JLabel.TOP);
+        return etiqueta;
     }
 
     private JButton botonEliminar(String texto) {
-        JButton b = new JButton(texto);
-        b.setToolTipText("Tambien con Suprimir o Retroceso");
-        b.addActionListener(e -> tablero.eliminarSeleccion());
-        return b;
+        JButton boton = new JButton(texto);
+        boton.setToolTipText("Tambien con Suprimir o Retroceso");
+        boton.addActionListener(e -> {
+            tablero.eliminarSeleccion();
+            String aviso = tablero.recogerAviso();
+            if (aviso != null) {
+                javax.swing.JOptionPane.showMessageDialog(this, aviso, "Aviso",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        return boton;
     }
 
     // No pasa por avisar(): reconstruiria el panel a media escritura.
-    private void renombrar(NodoVista nodo, String texto) {
-        nodo.setNombre(texto);
+    private void renombrar(Figura figura, String texto) {
+        figura.getElemento().setNombre(texto);
         lienzo.repaint();
     }
 }

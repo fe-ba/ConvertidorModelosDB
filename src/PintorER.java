@@ -1,9 +1,10 @@
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Composite;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.Shape;
 import java.awt.geom.RoundRectangle2D;
@@ -12,11 +13,12 @@ import java.awt.geom.RoundRectangle2D;
 public final class PintorER {
 
     private static final int PASO_REJILLA = 28;
+    private static final double SEPARACION_TOTAL = 3.4;
 
     private PintorER() {
     }
 
-    // Solo la zona del lienzo que se ve ahora mismo.
+    // Rejilla solo en la zona visible.
     public static void rejilla(Graphics2D g2, Rectangle visible) {
         int desdeX = (visible.x / PASO_REJILLA - 1) * PASO_REJILLA;
         int desdeY = (visible.y / PASO_REJILLA - 1) * PASO_REJILLA;
@@ -31,109 +33,129 @@ public final class PintorER {
         }
     }
 
+    // Lineas de atributo a su duenno, y participaciones con su cardinalidad.
     public static void enlaces(Graphics2D g2, Tablero tablero) {
         g2.setColor(Tema.LINEA);
         g2.setStroke(new BasicStroke(1.6f));
-        for (NodoVista nodo : tablero.getNodos()) {
-            if (nodo.getPadre() != null) {
-                g2.drawLine(nodo.getX(), nodo.getY(),
-                        nodo.getPadre().getX(), nodo.getPadre().getY());
+        for (Figura figura : tablero.getFiguras()) {
+            if (figura.esAtributo()) {
+                Figura duenno = Figura.de(figura.getDuenno());
+                g2.drawLine(figura.getX(), figura.getY(), duenno.getX(), duenno.getY());
             }
         }
-        for (Enlace enlace : tablero.getEnlaces()) {
-            boolean activo = (enlace == tablero.getEnlaceSeleccionado());
-            g2.setColor(activo ? Tema.ORO : Tema.TEAL);
-            g2.setStroke(new BasicStroke(activo ? 3f : 1.6f));
-            NodoVista a = enlace.getOrigen();
-            NodoVista b = enlace.getDestino();
-            g2.drawLine(a.getX(), a.getY(), b.getX(), b.getY());
-            punta(g2, a, b);
+        for (EnlaceVista enlace : tablero.getEnlaces()) {
+            participacion(g2, enlace, enlace == tablero.getEnlaceSeleccionado());
         }
     }
 
-    // Un solo camino para cualquier simbolo: la geometria la da FormaSimbolo.
-    public static void nodo(Graphics2D g2, NodoVista nodo, boolean activo) {
-        Rectangle r = nodo.limites();
-        Shape contorno = FormaSimbolo.contorno(nodo.getTipo(), r);
+    // Notacion de Chen: linea doble si la participacion es total, y una cajita
+    // con la cardinalidad hacia el lado de la entidad.
+    private static void participacion(Graphics2D g2, EnlaceVista enlace, boolean activo) {
+        Figura relacion = Figura.de(enlace.getRelacion());
+        Figura entidad = Figura.de(enlace.getEntidad());
+        int rx = relacion.getX();
+        int ry = relacion.getY();
+        int ex = entidad.getX();
+        int ey = entidad.getY();
 
-        g2.setColor(relleno(nodo));
+        g2.setColor(activo ? Tema.ORO : Tema.LINEA);
+        g2.setStroke(new BasicStroke(activo ? 3f : 1.6f));
+        if (enlace.getParte().getModalidad() == Modalidad.TOTAL) {
+            double dx = ex - rx;
+            double dy = ey - ry;
+            double largo = Math.max(1, Math.hypot(dx, dy));
+            int nx = (int) Math.round(-dy / largo * SEPARACION_TOTAL);
+            int ny = (int) Math.round(dx / largo * SEPARACION_TOTAL);
+            g2.drawLine(rx + nx, ry + ny, ex + nx, ey + ny);
+            g2.drawLine(rx - nx, ry - ny, ex - nx, ey - ny);
+        } else {
+            g2.drawLine(rx, ry, ex, ey);
+        }
+        cardinalidad(g2, enlace, rx + (int) ((ex - rx) * 0.62),
+                ry + (int) ((ey - ry) * 0.62), activo);
+    }
+
+    private static void cardinalidad(Graphics2D g2, EnlaceVista enlace,
+                                     int cx, int cy, boolean activo) {
+        String texto = enlace.getParte().getCardinalidad() == Cardinalidad.UNO ? "1" : "N";
+        Rectangle caja = new Rectangle(cx - 13, cy - 11, 26, 22);
+        g2.setColor(Tema.FONDO);
+        g2.fill(caja);
+        g2.setColor(activo ? Tema.ORO : Tema.BORDE);
+        g2.setStroke(new BasicStroke(1f));
+        g2.draw(caja);
+        g2.setColor(Tema.TEAL);
+        g2.setFont(Tema.ETIQUETA);
+        FontMetrics fm = g2.getFontMetrics();
+        g2.drawString(texto, cx - fm.stringWidth(texto) / 2, cy + 5);
+    }
+
+    // Un solo camino para cualquier simbolo: la geometria la da FormaSimbolo.
+    public static void nodo(Graphics2D g2, Figura figura, boolean activo) {
+        dibujar(g2, figura.getTipo(), figura.getNombre(), figura.limites(), activo);
+    }
+
+    private static void dibujar(Graphics2D g2, TipoNodo tipo, String nombre,
+                                Rectangle r, boolean activo) {
+        Shape contorno = FormaSimbolo.contorno(tipo, r);
+        g2.setColor(relleno(tipo));
         g2.fill(contorno);
-        g2.setColor(activo ? Tema.ORO : borde(nodo));
-        g2.setStroke(new BasicStroke(activo ? 2.4f : grosor(nodo)));
+        g2.setColor(activo ? Tema.ORO : borde(tipo));
+        g2.setStroke(new BasicStroke(activo ? 2.4f : grosor(tipo)));
         g2.draw(contorno);
 
-        Shape interior = FormaSimbolo.interior(nodo.getTipo(), r);
+        Shape interior = FormaSimbolo.interior(tipo, r);
         if (interior != null) {
             g2.setStroke(new BasicStroke(1.2f));
             g2.draw(interior);
         }
-        if (!nodo.getNombre().isEmpty()) {
-            texto(g2, nodo);
+        if (!nombre.isEmpty()) {
+            texto(g2, tipo, nombre, r);
         }
     }
 
-    private static java.awt.Color relleno(NodoVista nodo) {
-        if (nodo.esAtributo()) {
-            return Tema.RELLENO_ATRIBUTO;
+    private static Color relleno(TipoNodo tipo) {
+        switch (tipo) {
+            case ATRIBUTO:
+            case ATRIBUTO_CLAVE:
+                return Tema.RELLENO_ATRIBUTO;
+            case RELACION:
+            case RELACION_IDENTIFICADORA:
+                return Tema.RELLENO_RELACION;
+            default:
+                return Tema.RELLENO_ENTIDAD;
         }
-        return nodo.esRelacion() ? Tema.RELLENO_RELACION : Tema.RELLENO_ENTIDAD;
     }
 
-    private static java.awt.Color borde(NodoVista nodo) {
-        if (nodo.getTipo() == TipoNodo.ATRIBUTO_CLAVE) {
-            return Tema.ORO.darker();
+    private static Color borde(TipoNodo tipo) {
+        switch (tipo) {
+            case ATRIBUTO_CLAVE:
+                return Tema.ORO.darker();
+            case ATRIBUTO:
+                return Tema.BORDE_ATRIBUTO;
+            case RELACION:
+            case RELACION_IDENTIFICADORA:
+                return Tema.BORDE_RELACION;
+            default:
+                return Tema.BORDE_ENTIDAD;
         }
-        if (nodo.esAtributo()) {
-            return Tema.BORDE_ATRIBUTO;
-        }
-        return nodo.esRelacion() ? Tema.BORDE_RELACION : Tema.BORDE_ENTIDAD;
     }
 
-    private static float grosor(NodoVista nodo) {
-        return nodo.esAtributo() ? 1.4f : 1.7f;
+    private static float grosor(TipoNodo tipo) {
+        return (tipo == TipoNodo.ATRIBUTO || tipo == TipoNodo.ATRIBUTO_CLAVE)
+                ? 1.4f : 1.7f;
     }
 
-    private static void texto(Graphics2D g2, NodoVista nodo) {
+    private static void texto(Graphics2D g2, TipoNodo tipo, String nombre, Rectangle r) {
         g2.setFont(Tema.ETIQUETA);
-        g2.setColor(nodo.getTipo() == TipoNodo.ATRIBUTO_CLAVE ? Tema.ORO : Tema.TEXTO);
-        int ancho = g2.getFontMetrics().stringWidth(nodo.getNombre());
-        int base = nodo.getY() + 5;
-        g2.drawString(nodo.getNombre(), nodo.getX() - ancho / 2, base);
-        if (nodo.getTipo() == TipoNodo.ATRIBUTO_CLAVE) {
-            g2.drawLine(nodo.getX() - ancho / 2, base + 3,
-                    nodo.getX() + ancho / 2, base + 3);
+        g2.setColor(tipo == TipoNodo.ATRIBUTO_CLAVE ? Tema.ORO : Tema.TEXTO);
+        int ancho = g2.getFontMetrics().stringWidth(nombre);
+        int cx = r.x + r.width / 2;
+        int base = r.y + r.height / 2 + 5;
+        g2.drawString(nombre, cx - ancho / 2, base);
+        if (tipo == TipoNodo.ATRIBUTO_CLAVE) {
+            g2.drawLine(cx - ancho / 2, base + 3, cx + ancho / 2, base + 3);
         }
-    }
-
-    // Punta de flecha apoyada en el borde del nodo de destino.
-    private static void punta(Graphics2D g2, NodoVista desde, NodoVista hasta) {
-        Point p = puntoBorde(hasta, desde.getX(), desde.getY());
-        double ang = Math.atan2(hasta.getY() - desde.getY(),
-                hasta.getX() - desde.getX());
-        int largo = 11;
-        Polygon punta = new Polygon();
-        punta.addPoint(p.x, p.y);
-        punta.addPoint((int) (p.x - largo * Math.cos(ang - 0.4)),
-                (int) (p.y - largo * Math.sin(ang - 0.4)));
-        punta.addPoint((int) (p.x - largo * Math.cos(ang + 0.4)),
-                (int) (p.y - largo * Math.sin(ang + 0.4)));
-        g2.fillPolygon(punta);
-    }
-
-    private static Point puntoBorde(NodoVista nodo, int haciaX, int haciaY) {
-        Rectangle r = nodo.limites();
-        double dx = haciaX - nodo.getX();
-        double dy = haciaY - nodo.getY();
-        if (dx == 0 && dy == 0) {
-            return new Point(nodo.getX(), nodo.getY());
-        }
-        double escalaX = (Math.abs(dx) < 0.001)
-                ? Double.MAX_VALUE : (r.width / 2.0) / Math.abs(dx);
-        double escalaY = (Math.abs(dy) < 0.001)
-                ? Double.MAX_VALUE : (r.height / 2.0) / Math.abs(dy);
-        double escala = Math.min(escalaX, escalaY);
-        return new Point((int) (nodo.getX() + dx * escala),
-                (int) (nodo.getY() + dy * escala));
     }
 
     public static void asa(Graphics2D g2, Point centro, int radio) {
@@ -147,7 +169,7 @@ public final class PintorER {
         g2.drawLine(centro.x, centro.y + 4, centro.x + 4, centro.y);
     }
 
-    public static void flechaEnCurso(Graphics2D g2, NodoVista desde, Point hasta) {
+    public static void flechaEnCurso(Graphics2D g2, Figura desde, Point hasta) {
         g2.setColor(Tema.TEAL);
         g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND, 1f, new float[] {6f, 5f}, 0f));
@@ -170,7 +192,7 @@ public final class PintorER {
     public static void previsualizacion(Graphics2D g2, TipoNodo tipo, Point donde) {
         Composite antes = g2.getComposite();
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
-        nodo(g2, new NodoVista(tipo, "", donde.x, donde.y), false);
+        dibujar(g2, tipo, "", Figura.limites(tipo, "", donde.x, donde.y), false);
         g2.setComposite(antes);
     }
 
@@ -192,6 +214,14 @@ public final class PintorER {
         g2.drawLine(cx + 5, cy - 5, cx + 4, cy + 8);
         g2.drawLine(cx - 4, cy + 8, cx + 4, cy + 8);
         g2.drawLine(cx, cy - 2, cx, cy + 5);
+    }
+
+    // Recordatorio de los gestos de navegacion.
+    public static void ayudaDeNavegacion(Graphics2D g2, int x, int y) {
+        g2.setColor(Tema.TENUE);
+        g2.setFont(Tema.MENUDA);
+        g2.drawString("rueda: zoom   ·   boton central o espacio: desplazar"
+                + "   ·   Inicio: encuadrar", x, y);
     }
 
     public static void nivelDeZoom(Graphics2D g2, double escala, int x, int y) {

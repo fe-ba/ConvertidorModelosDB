@@ -1,3 +1,4 @@
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -42,9 +43,12 @@ public class LienzoER extends JPanel {
 
     // --- gestos en curso ---
     private Point ultimoArrastre;
-    private transient NodoVista enlazandoDesde;
+    private transient Figura enlazandoDesde;
     private Point puntaFlecha;
     private Point inicioMarco;
+    // Desplazar el lienzo: con el boton central, o con espacio pulsado.
+    private Point inicioPanoramica;
+    private boolean espacioPulsado;
     private Rectangle marco;
     private transient TipoNodo previsualizando;
     private Point puntoPrevisualizacion;
@@ -115,6 +119,7 @@ public class LienzoER extends JPanel {
                 JOptionPane.WARNING_MESSAGE);
         if (respuesta == JOptionPane.OK_OPTION) {
             tablero.vaciar();
+            mostrarAvisoPendiente();
         }
     }
 
@@ -122,11 +127,27 @@ public class LienzoER extends JPanel {
     public void soltar(TipoNodo tipo, int x, int y) {
         if (!tablero.puedeColocarse(tipo, x, y)) {
             JOptionPane.showMessageDialog(this,
-                    "Suelta el atributo cerca de una entidad o de una relacion.",
+                    "Suelta el atributo cerca de una entidad. El modelo no admite "
+                    + "atributos en las relaciones.",
                     "Nada donde engancharlo", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        tablero.agregar(tipo, tablero.nombrePorDefecto(tipo), x, y);
+        try {
+            tablero.agregar(tipo, x, y);
+        } catch (RuntimeException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(),
+                    "No se pudo crear", JOptionPane.WARNING_MESSAGE);
+        }
+        mostrarAvisoPendiente();
+    }
+
+    // El tablero deja anotado lo que el modelo todavia no permite hacer.
+    private void mostrarAvisoPendiente() {
+        String aviso = tablero.recogerAviso();
+        if (aviso != null) {
+            JOptionPane.showMessageDialog(this, aviso, "Aviso",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     // Para el doble clic en la paleta.
@@ -136,13 +157,13 @@ public class LienzoER extends JPanel {
     }
 
     // --- Asa de enlazar ---
-    private Point asaDe(NodoVista nodo) {
-        Rectangle r = nodo.limites();
+    private Point asaDe(Figura figura) {
+        Rectangle r = figura.limites();
         return new Point(r.x + r.width + RADIO_ASA + 2, r.y + r.height / 2);
     }
 
     private boolean sobreElAsa(int x, int y) {
-        NodoVista unico = tablero.getSeleccionado();
+        Figura unico = tablero.getSeleccionado();
         if (unico == null || unico.esAtributo()) {
             return false;
         }
@@ -161,6 +182,16 @@ public class LienzoER extends JPanel {
                     pedirVaciado();
                     return;
                 }
+                // un gesto nuevo empieza limpio: si el anterior no cerro bien
+                // (por ejemplo, se solto el raton fuera del lienzo), no debe
+                // arrastrarse un marco a medias hasta este
+                inicioMarco = null;
+                marco = null;
+                if (esGestoDeDesplazar(e)) {
+                    inicioPanoramica = e.getPoint();
+                    setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                    return;
+                }
                 Point m = aMundo(e.getX(), e.getY());
                 // Orden: asa, nodo, enlace, fondo. Al reves, una linea encima taparia al nodo.
                 if (sobreElAsa(m.x, m.y)) {
@@ -169,7 +200,7 @@ public class LienzoER extends JPanel {
                     repaint();
                     return;
                 }
-                NodoVista bajo = tablero.nodoEn(m.x, m.y);
+                Figura bajo = tablero.figuraEn(m.x, m.y);
                 if (bajo != null) {
                     if (e.isControlDown() || e.isShiftDown()) {
                         tablero.alternarSeleccion(bajo);
@@ -179,7 +210,7 @@ public class LienzoER extends JPanel {
                     ultimoArrastre = m;
                     return;
                 }
-                Enlace enlace = tablero.enlaceEn(m.x, m.y);
+                EnlaceVista enlace = tablero.enlaceEn(m.x, m.y);
                 if (enlace != null) {
                     tablero.seleccionarEnlace(enlace);
                     return;
@@ -191,6 +222,13 @@ public class LienzoER extends JPanel {
 
             @Override
             public void mouseDragged(MouseEvent e) {
+                if (inicioPanoramica != null) {
+                    origenX += e.getX() - inicioPanoramica.x;
+                    origenY += e.getY() - inicioPanoramica.y;
+                    inicioPanoramica = e.getPoint();
+                    repaint();
+                    return;
+                }
                 Point m = aMundo(e.getX(), e.getY());
                 if (enlazandoDesde != null) {
                     puntaFlecha = m;
@@ -205,11 +243,11 @@ public class LienzoER extends JPanel {
                     return;
                 }
                 if (ultimoArrastre != null && !tablero.getSeleccionados().isEmpty()) {
-                    // el grupo entero se mueve con el mismo desplazamiento
                     int dx = m.x - ultimoArrastre.x;
                     int dy = m.y - ultimoArrastre.y;
-                    for (NodoVista nodo : tablero.getSeleccionados()) {
-                        nodo.mover(nodo.getX() + dx, nodo.getY() + dy);
+                    for (Figura figura : tablero.arrastrablesCon(
+                            tablero.getSeleccionados())) {
+                        figura.desplazar(dx, dy);
                     }
                     ultimoArrastre = m;
                     repaint();
@@ -218,11 +256,17 @@ public class LienzoER extends JPanel {
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                if (inicioPanoramica != null) {
+                    inicioPanoramica = null;
+                    setCursor(Cursor.getDefaultCursor());
+                    return;
+                }
                 Point m = aMundo(e.getX(), e.getY());
                 if (enlazandoDesde != null) {
-                    tablero.enlazar(enlazandoDesde, tablero.nodoEn(m.x, m.y));
+                    tablero.enlazar(enlazandoDesde, tablero.figuraEn(m.x, m.y));
                     enlazandoDesde = null;
                     puntaFlecha = null;
+                    mostrarAvisoPendiente();
                 }
                 if (marco != null) {
                     seleccionarDentroDelMarco();
@@ -237,15 +281,22 @@ public class LienzoER extends JPanel {
         addMouseMotionListener(raton);
     }
 
+    // Boton central, o boton izquierdo con la barra espaciadora pulsada.
+    // El arrastre normal sobre el fondo ya lo ocupa el marco de seleccion.
+    private boolean esGestoDeDesplazar(MouseEvent e) {
+        return e.getButton() == MouseEvent.BUTTON2
+                || (espacioPulsado && e.getButton() == MouseEvent.BUTTON1);
+    }
+
     // Entra todo lo que el marco toque, aunque sea en parte.
     private void seleccionarDentroDelMarco() {
         if (marco.width < 4 && marco.height < 4) {
             return;   // fue un clic, no un arrastre
         }
-        List<NodoVista> dentro = new ArrayList<NodoVista>();
-        for (NodoVista nodo : tablero.getNodos()) {
-            if (marco.intersects(nodo.limites())) {
-                dentro.add(nodo);
+        List<Figura> dentro = new ArrayList<Figura>();
+        for (Figura figura : tablero.getFiguras()) {
+            if (marco.intersects(figura.limites())) {
+                dentro.add(figura);
             }
         }
         tablero.seleccionarVarios(dentro);
@@ -261,8 +312,42 @@ public class LienzoER extends JPanel {
         getActionMap().put("borrar", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
                 tablero.eliminarSeleccion();
+                mostrarAvisoPendiente();
             }
         });
+
+        getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke("pressed SPACE"), "manoAbajo");
+        getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke("released SPACE"), "manoArriba");
+        getActionMap().put("manoAbajo", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                espacioPulsado = true;
+                setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+            }
+        });
+        getActionMap().put("manoArriba", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                espacioPulsado = false;
+                setCursor(Cursor.getDefaultCursor());
+            }
+        });
+
+        getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_HOME, 0), "encuadrar");
+        getActionMap().put("encuadrar", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                encuadrar();
+            }
+        });
+    }
+
+    // Devuelve la vista al origen y al 100 por cien.
+    public void encuadrar() {
+        escala = 1.0;
+        origenX = 0;
+        origenY = 0;
+        repaint();
     }
 
     // --- Soltar desde la paleta ---
@@ -341,10 +426,10 @@ public class LienzoER extends JPanel {
 
         PintorER.rejilla(mundo, zonaVisible());
         PintorER.enlaces(mundo, tablero);
-        for (NodoVista nodo : tablero.getNodos()) {
-            PintorER.nodo(mundo, nodo, tablero.estaSeleccionado(nodo));
+        for (Figura figura : tablero.getFiguras()) {
+            PintorER.nodo(mundo, figura, tablero.estaSeleccionado(figura));
         }
-        NodoVista unico = tablero.getSeleccionado();
+        Figura unico = tablero.getSeleccionado();
         if (unico != null && !unico.esAtributo()) {
             PintorER.asa(mundo, asaDe(unico), RADIO_ASA);
         }
@@ -366,8 +451,9 @@ public class LienzoER extends JPanel {
         if (!tablero.estaVacio()) {
             PintorER.iconoVaciar(fijo, zonaIconoVaciar());
         }
+        PintorER.ayudaDeNavegacion(fijo, 12, getHeight() - 12);
         if (Math.abs(escala - 1.0) >= 0.01) {
-            PintorER.nivelDeZoom(fijo, escala, 12, getHeight() - 12);
+            PintorER.nivelDeZoom(fijo, escala, 12, getHeight() - 28);
         }
     }
 
