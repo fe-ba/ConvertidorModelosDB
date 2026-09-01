@@ -36,6 +36,20 @@ public final class Tema {
     public static final Color TENUE = new Color(0x8B, 0x9A, 0xA2);
     public static final Color TRAZO_ICONO = new Color(0xC9, 0xD5, 0xDA);
 
+    // --- diagrama relacional ---
+    public static final Color RELLENO_TABLA = new Color(0x17, 0x1D, 0x21);
+    public static final Color CABECERA_TABLA = new Color(0x1E, 0x26, 0x2B);
+    public static final Color BORDE_TABLA = new Color(0x38, 0x44, 0x4B);
+    public static final Color TEXTO_COLUMNA = new Color(0xC9, 0xD5, 0xDA);
+    public static final Color VIOLETA = new Color(0xC7, 0x7D, 0xFF);
+
+    public static final Font TITULO_TABLA =
+            new Font(Font.SANS_SERIF, Font.BOLD, 13);
+    public static final Font COLUMNA =
+            new Font(Font.MONOSPACED, Font.PLAIN, 12);
+    public static final Font CODIGO =
+            new Font(Font.MONOSPACED, Font.PLAIN, 13);
+
     public static final Font ETIQUETA = new Font(Font.SANS_SERIF, Font.PLAIN, 13);
     public static final Font MENUDA = new Font(Font.SANS_SERIF, Font.PLAIN, 11);
 }

@@ -25,20 +25,16 @@ public class VentanaPrincipal extends JFrame {
     private transient Tablero tablero;
     private LienzoER lienzo;
     private JPanel paginaER;
-    private final JTextArea areaRelacional;
-    private final JTextArea areaCodigo;
+    private final LienzoRelacional lienzoRelacional;
+    private final VistaCodigo vistaCodigo;
     private JComboBox<Destino> destinos;
     private JTabbedPane pestanas;
 
     public VentanaPrincipal() {
         super("Modelador E-R");
         this.fachada = new Fachada();
-        this.areaRelacional = new JTextArea(
-                "Convierte el diagrama E-R para ver el esquema relacional aqui.");
-        areaRelacional.setEditable(false);
-        this.areaCodigo = new JTextArea(
-                "-- El codigo aparecera aqui al convertir el diagrama.");
-        areaCodigo.setEditable(false);
+        this.lienzoRelacional = new LienzoRelacional();
+        this.vistaCodigo = new VistaCodigo();
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1240, 780);
@@ -49,8 +45,7 @@ public class VentanaPrincipal extends JFrame {
         paginaER = new JPanel(new BorderLayout());
         montarLienzo();
         pestanas.addTab("Diagrama E-R", paginaER);
-        pestanas.addTab("Diagrama relacional",
-                new JScrollPane(areaRelacional));
+        pestanas.addTab("Diagrama relacional", lienzoRelacional);
         pestanas.addTab("Codigo", montarPaginaCodigo());
         pestanas.addChangeListener(this::alCambiarPestana);
         add(pestanas, BorderLayout.CENTER);
@@ -75,7 +70,7 @@ public class VentanaPrincipal extends JFrame {
         JPanel superior = new JPanel(new BorderLayout());
         superior.add(destinos, BorderLayout.WEST);
         panel.add(superior, BorderLayout.NORTH);
-        panel.add(new JScrollPane(areaCodigo), BorderLayout.CENTER);
+        panel.add(new JScrollPane(vistaCodigo), BorderLayout.CENTER);
         return panel;
     }
 
@@ -169,7 +164,8 @@ public class VentanaPrincipal extends JFrame {
     // en su pestana y el codigo generado en la pestana de codigo.
     private void convertir() {
         List<Aviso> avisos = fachada.convertir();
-        areaRelacional.setText(textoRelacional());
+        lienzoRelacional.setModelo(fachada.getModelo());
+        lienzoRelacional.mostrar(fachada.getEsquema());
         generarCodigo();
 
         List<Aviso> errores = new java.util.ArrayList<>();
@@ -199,7 +195,8 @@ public class VentanaPrincipal extends JFrame {
                     otros.size() + " advertencia(s)",
                     JOptionPane.WARNING_MESSAGE);
         } else {
-            areaRelacional.setText(textoRelacional());
+            lienzoRelacional.setModelo(fachada.getModelo());
+        lienzoRelacional.mostrar(fachada.getEsquema());
         }
     }
 
@@ -221,43 +218,10 @@ public class VentanaPrincipal extends JFrame {
             return;
         }
         try {
-            areaCodigo.setText(fachada.generarCodigo(destino));
+            vistaCodigo.mostrar(fachada.generarCodigo(destino));
         } catch (IllegalStateException e) {
-            areaCodigo.setText(e.getMessage());
+            vistaCodigo.mostrar("-- " + e.getMessage());
         }
     }
 
-    // Vista textual del esquema relacional: una línea por tabla con sus
-    // columnas, la clave primaria y las referencias foráneas.
-    private String textoRelacional() {
-        EsquemaRelacional esquema = fachada.getEsquema();
-        if (esquema == null) {
-            return "Primero convierte el diagrama E-R.";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Tabla tabla : esquema.getTablas()) {
-            sb.append(tabla.getNombre()).append("\n");
-            for (Columna columna : tabla.getColumnas()) {
-                sb.append("  ");
-                if (tabla.esClave(columna.getNombre())) {
-                    sb.append("PK ");
-                }
-                if (tabla.esForanea(columna.getNombre())) {
-                    sb.append("FK ");
-                }
-                sb.append(columna.getNombre()).append("  ")
-                        .append(columna.getTipo())
-                        .append(columna.admiteNulos() ? " NULL" : " NOT NULL")
-                        .append("\n");
-            }
-            for (Restriccion restriccion : tabla.foraneas()) {
-                sb.append("   -> ").append(restriccion.getTablaReferida())
-                        .append("(")
-                        .append(String.join(", ", restriccion.getColumnasReferidas()))
-                        .append(")\n");
-            }
-            sb.append("\n");
-        }
-        return sb.toString().stripTrailing();
-    }
 }
