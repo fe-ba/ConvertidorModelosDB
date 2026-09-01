@@ -148,6 +148,19 @@ public class ModeloER {
     }
 
     /**
+     * Elimina una relación del modelo junto con sus participaciones.
+     *
+     * @param id identificador de la relación
+     * @throws IllegalArgumentException si no existe ninguna con ese id
+     */
+    public void quitarRelacion(String id) {
+        boolean encontrada = relaciones.removeIf(r -> r.getId().equals(id));
+        if (!encontrada) {
+            throw new IllegalArgumentException("No existe una relación con el id indicado.");
+        }
+    }
+
+    /**
      * Devuelve las relaciones en las que participa la entidad indicada.
      */
     public List<Relacion> relacionesDe(String idEntidad) {
@@ -179,6 +192,14 @@ public class ModeloER {
             if (entidad.getAtributos().isEmpty()) {
                 avisos.add(new Aviso(Severidad.ERROR,
                         "La entidad debe tener al menos un atributo.",
+                        entidad.getNombre()));
+            } else if (entidad.clave().isEmpty()) {
+                // Sin clave no hay PRIMARY KEY, y entonces ninguna otra tabla
+                // puede referenciarla: mejor avisar aquí que al convertir.
+                avisos.add(new Aviso(Severidad.ERROR,
+                        entidad.esDebil()
+                                ? "La entidad débil necesita un atributo clave parcial."
+                                : "La entidad necesita al menos un atributo marcado como clave.",
                         entidad.getNombre()));
             }
             validarNombreYPosicion(entidad, avisos);

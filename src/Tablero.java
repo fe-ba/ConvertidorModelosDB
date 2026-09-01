@@ -148,8 +148,6 @@ public class Tablero {
                 if (duenno == null) {
                     return null;
                 }
-                // EnumSet y no HashSet: el constructor de Atributo hace
-                // EnumSet.copyOf, que revienta con una coleccion vacia normal
                 Atributo atributo = new Atributo(nombre, TipoDato.TEXTO_CORTO,
                         Naturaleza.SIMPLE, java.util.EnumSet.noneOf(Marca.class),
                         new Punto(x - duenno.getPosicion().getX(),
@@ -157,11 +155,6 @@ public class Tablero {
                 if (tipo == TipoNodo.ATRIBUTO_CLAVE) {
                     atributo.marcar(Marca.CLAVE, true);
                 }
-                // el constructor de Atributo suma (10,10) al desplazamiento
-                // que recibe, asi que se fija despues para que caiga donde se solto
-                atributo.setDesplazamiento(new Punto(
-                        x - duenno.getPosicion().getX(),
-                        y - duenno.getPosicion().getY()));
                 duenno.agregarAtributo(atributo);
                 Figura figura = Figura.deAtributo(atributo, duenno);
                 seleccionarSolo(figura);
@@ -223,9 +216,7 @@ public class Tablero {
         } else if (figura.esAtributo()) {
             figura.getDuenno().quitarAtributo(figura.getNombre());
         } else {
-            // ModeloER todavia no permite quitar relaciones
-            ultimoAviso = "El modelo aun no permite eliminar relaciones. "
-                    + "Quitale sus participaciones para dejarla suelta.";
+            modelo.quitarRelacion(figura.getId());
         }
     }
 
@@ -248,13 +239,12 @@ public class Tablero {
         for (Entidad entidad : new ArrayList<>(modelo.getEntidades())) {
             modelo.quitarEntidad(entidad.getId());
         }
+        for (Relacion relacion : new ArrayList<>(modelo.getRelaciones())) {
+            modelo.quitarRelacion(relacion.getId());
+        }
         contadores.clear();
         seleccionados.clear();
         enlaceSeleccionado = null;
-        if (!modelo.getRelaciones().isEmpty()) {
-            ultimoAviso = "Quedan relaciones sueltas: el modelo aun no permite "
-                    + "eliminarlas.";
-        }
         avisar();
     }
 

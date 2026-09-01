@@ -18,6 +18,7 @@ public class PruebaInterfaz {
         probarLienzo();
         probarPersistencia();
         probarFachada();
+        probarModeloER();
         System.out.println(fallos == 0 ? "\nTODO CORRECTO" : "\n" + fallos + " FALLOS");
         System.exit(fallos);
     }
@@ -164,6 +165,45 @@ public class PruebaInterfaz {
         }
         debe("propone el nombre del archivo de salida",
                 fachada.nombreDeArchivo(Destino.SQLALCHEMY).equals("esquema.py"));
+    }
+
+    // Lo que antes rodeaba la interfaz porque el modelo no lo permitia.
+    private static void probarModeloER() {
+        System.out.println("\n--- Modelo E-R ---");
+        Atributo suelto = new Atributo("x", TipoDato.TEXTO_CORTO, Naturaleza.SIMPLE,
+                new java.util.HashSet<>(), new Punto(50, -80));
+        debe("un atributo sin marcas no revienta al construirse", true);
+        debe("y conserva el desplazamiento que se le da",
+                suelto.getDesplazamiento().getX() == 50
+                        && suelto.getDesplazamiento().getY() == -80);
+
+        ModeloER modelo = new ModeloER();
+        Tablero tablero = new Tablero(modelo);
+        tablero.agregar(TipoNodo.ENTIDAD, 100, 100);
+        tablero.agregar(TipoNodo.RELACION, 300, 100);
+        Relacion relacion = modelo.getRelaciones().get(0);
+        tablero.enlazar(Figura.de(relacion), Figura.de(modelo.getEntidades().get(0)));
+        tablero.seleccionarSolo(Figura.de(relacion));
+        tablero.eliminarSeleccion();
+        debe("una relacion se puede eliminar", modelo.getRelaciones().isEmpty());
+        debe("sin avisar de que no se puede", tablero.recogerAviso() == null);
+        debe("y la entidad sigue en su sitio", modelo.getEntidades().size() == 1);
+
+        tablero.agregar(TipoNodo.RELACION, 300, 100);
+        tablero.vaciar();
+        debe("vaciar se lleva tambien las relaciones", tablero.estaVacio());
+
+        ModeloER sinClave = new ModeloER();
+        Entidad entidad = new Entidad("SinClave", new Punto(0, 0), false);
+        entidad.agregarAtributo(new Atributo("dato", TipoDato.TEXTO_CORTO,
+                Naturaleza.SIMPLE, java.util.EnumSet.noneOf(Marca.class),
+                new Punto(0, -110)));
+        sinClave.agregarEntidad(entidad);
+        debe("validar avisa si falta el atributo clave",
+                sinClave.validar().stream()
+                        .anyMatch(a -> a.getMensaje().contains("clave")));
+        entidad.getAtributos().get(0).marcar(Marca.CLAVE, true);
+        debe("y deja de avisar al marcarlo", sinClave.validar().isEmpty());
     }
 
     // --- utilidades ---

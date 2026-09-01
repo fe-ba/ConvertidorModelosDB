@@ -193,14 +193,11 @@ public class RepositorioJson implements IRepositorio {
             }
         }
         Punto desplazamiento = punto(datos.get("desplazamiento"));
-        Atributo atributo = new Atributo(
+        return new Atributo(
                 Json.comoTexto(datos.get("nombre"), "atributo"),
                 valorDe(TipoDato.class, datos.get("tipo"), TipoDato.TEXTO_CORTO),
                 valorDe(Naturaleza.class, datos.get("naturaleza"), Naturaleza.SIMPLE),
                 marcas, desplazamiento);
-        // el constructor suma (10,10) al desplazamiento que recibe
-        atributo.setDesplazamiento(desplazamiento);
-        return atributo;
     }
 
     private Punto punto(Object crudo) {

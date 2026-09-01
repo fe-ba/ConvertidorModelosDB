@@ -14,8 +14,8 @@ public class Atributo extends ElementoDelModelo {
     private Punto desplazamiento;
 
     public Atributo(String nombre, TipoDato tipo, Naturaleza naturaleza,
-                    Set<Marca> marcas, Punto posicion) {
-        super(nombre, posicion);
+                    Set<Marca> marcas, Punto desplazamiento) {
+        super(nombre, desplazamiento);
         if (tipo == null) {
             throw new IllegalArgumentException("El tipo de dato del atributo no puede ser nulo.");
         }
@@ -27,8 +27,13 @@ public class Atributo extends ElementoDelModelo {
         }
         this.tipo = tipo;
         this.naturaleza = naturaleza;
-        this.marcas = EnumSet.copyOf(marcas);
-        this.desplazamiento = posicion.desplazado(10, 10);
+        // EnumSet.copyOf lanza excepción con una colección vacía que no sea un
+        // EnumSet, y un atributo sin marcas es el caso más normal.
+        this.marcas = marcas.isEmpty() ? EnumSet.noneOf(Marca.class)
+                : EnumSet.copyOf(marcas);
+        // El desplazamiento es el que se recibe: sumarle nada dejaba al
+        // atributo lejos de donde el usuario lo había soltado.
+        this.desplazamiento = desplazamiento;
     }
 
     public TipoDato getTipo() {
