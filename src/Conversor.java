@@ -81,20 +81,21 @@ public class Conversor implements IConversor {
                 continue;
             }
 
-            List<String> columnasHeredadas = copiarColumnasClave(clavePropietaria, tablaPropietaria, tablaDebil);
+            ClaveCopiada heredada = copiarColumnasClave(clavePropietaria, tablaPropietaria,
+                    tablaDebil, true);
 
             // La relación identificadora se traduce en una FK obligatoria con
             // borrado en cascada: si se borra el "dueño", las filas de la
             // entidad débil dejan de tener sentido por sí solas.
-            tablaDebil.restringir(Restriccion.foranea(columnasHeredadas,
-                    tablaPropietaria.getNombre(), columnasHeredadas,
+            tablaDebil.restringir(Restriccion.foranea(heredada.enDestino(),
+                    tablaPropietaria.getNombre(), heredada.enOrigen(),
                     AccionReferencial.CASCADA, AccionReferencial.CASCADA));
 
             // La clave primaria de la débil = clave heredada + su clave parcial (discriminante).
             List<String> claveParcial = entidad.clave().stream()
                     .map(Atributo::getNombre)
                     .collect(Collectors.toList());
-            List<String> claveCompuesta = new ArrayList<>(columnasHeredadas);
+            List<String> claveCompuesta = new ArrayList<>(heredada.enDestino());
             claveCompuesta.addAll(claveParcial);
             tablaDebil.definirClave(claveCompuesta);
 
@@ -110,8 +111,37 @@ public class Conversor implements IConversor {
 
     public void convertirRelaciones(ModeloER modelo, ResultadoConversion resultado) {
         for (Relacion relacion : modelo.getRelaciones()) {
+            // Las identificadoras ya se resolvieron al propagar la clave a las
+            // entidades débiles; volver a tratarlas duplicaba la clave heredada
+            // y creaba una segunda foránea con el mismo nombre.
+            if (yaResueltaComoIdentificadora(modelo, relacion)) {
+                continue;
+            }
             aplicarRegla(modelo, relacion, resultado);
         }
+    }
+
+    /** Cierto si la relación es identificadora y toca alguna entidad débil. */
+    private boolean yaResueltaComoIdentificadora(ModeloER modelo, Relacion relacion) {
+        if (!relacion.esIdentificadora()) {
+            return false;
+        }
+        for (Participacion parte : relacion.getParticipaciones()) {
+            Entidad entidad = buscarPorId(modelo, parte.getEntidad());
+            if (entidad != null && entidad.esDebil()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Entidad buscarPorId(ModeloER modelo, String id) {
+        for (Entidad entidad : modelo.getEntidades()) {
+            if (entidad.getId().equals(id)) {
+                return entidad;
+            }
+        }
+        return null;
     }
 
     public void aplicarRegla(ModeloER modelo, Relacion relacion, ResultadoConversion resultado) {
@@ -195,10 +225,13 @@ public class Conversor implements IConversor {
             return;
         }
 
-        List<String> columnasFk = copiarColumnasClave(claveOrigen, tablaOrigen, tablaDestino);
-        AccionReferencial alBorrar = destino.esObligatoria() ? AccionReferencial.CASCADA : AccionReferencial.ANULAR;
-        tablaDestino.restringir(Restriccion.foranea(columnasFk,
-                tablaOrigen.getNombre(), columnasFk, AccionReferencial.CASCADA, alBorrar));
+        AccionReferencial alBorrar = destino.esObligatoria()
+                ? AccionReferencial.CASCADA : AccionReferencial.ANULAR;
+        ClaveCopiada copia = copiarColumnasClave(claveOrigen, tablaOrigen, tablaDestino,
+                destino.esObligatoria());
+        tablaDestino.restringir(Restriccion.foranea(copia.enDestino(),
+                tablaOrigen.getNombre(), copia.enOrigen(),
+                AccionReferencial.CASCADA, alBorrar));
 
         resultado.anotar(TipoRegla.UNO_A_UNO,
                 "Relación 1:1 '" + relacion.getNombre() + "' resuelta con FK en '" + tablaDestino.getNombre() + "'.");
@@ -225,10 +258,13 @@ public class Conversor implements IConversor {
             return;
         }
 
-        List<String> columnasFk = copiarColumnasClave(claveUno, tablaUno, tablaMuchos);
-        AccionReferencial alBorrar = ladoMuchos.esObligatoria() ? AccionReferencial.CASCADA : AccionReferencial.ANULAR;
-        tablaMuchos.restringir(Restriccion.foranea(columnasFk,
-                tablaUno.getNombre(), columnasFk, AccionReferencial.CASCADA, alBorrar));
+        AccionReferencial alBorrar = ladoMuchos.esObligatoria()
+                ? AccionReferencial.CASCADA : AccionReferencial.ANULAR;
+        ClaveCopiada copia = copiarColumnasClave(claveUno, tablaUno, tablaMuchos,
+                ladoMuchos.esObligatoria());
+        tablaMuchos.restringir(Restriccion.foranea(copia.enDestino(),
+                tablaUno.getNombre(), copia.enOrigen(),
+                AccionReferencial.CASCADA, alBorrar));
 
         resultado.anotar(TipoRegla.UNO_A_MUCHOS,
                 "Relación 1:N '" + relacion.getNombre() + "' resuelta con FK en '" + tablaMuchos.getNombre() + "'.");
@@ -271,14 +307,15 @@ public class Conversor implements IConversor {
                 Tabla tablaAtributo = new Tabla(nombreTabla, OrigenTabla.ATRIBUTO_MULTIVALUADO, atributo.getId());
                 resultado.getEsquema().agregarTabla(tablaAtributo);
 
-                List<String> columnasFk = copiarColumnasClave(claveEntidad, tablaEntidad, tablaAtributo);
-                tablaAtributo.restringir(Restriccion.foranea(columnasFk,
-                        tablaEntidad.getNombre(), columnasFk,
+                ClaveCopiada copia = copiarColumnasClave(claveEntidad, tablaEntidad,
+                        tablaAtributo, true);
+                tablaAtributo.restringir(Restriccion.foranea(copia.enDestino(),
+                        tablaEntidad.getNombre(), copia.enOrigen(),
                         AccionReferencial.CASCADA, AccionReferencial.CASCADA));
 
                 tablaAtributo.agregarColumna(new Columna(atributo.getNombre(), atributo.getTipo(), false));
 
-                List<String> claveCompuesta = new ArrayList<>(columnasFk);
+                List<String> claveCompuesta = new ArrayList<>(copia.enDestino());
                 claveCompuesta.add(atributo.getNombre());
                 tablaAtributo.definirClave(claveCompuesta);
 
@@ -333,11 +370,12 @@ public class Conversor implements IConversor {
                         "La tabla '" + tablaEntidad.getNombre() + "' no tiene clave primaria.", relacion.getNombre()));
                 continue;
             }
-            List<String> columnasFk = copiarColumnasClave(claveEntidad, tablaEntidad, tablaRelacion);
-            tablaRelacion.restringir(Restriccion.foranea(columnasFk,
-                    tablaEntidad.getNombre(), columnasFk,
+            ClaveCopiada copia = copiarColumnasClave(claveEntidad, tablaEntidad,
+                    tablaRelacion, true);
+            tablaRelacion.restringir(Restriccion.foranea(copia.enDestino(),
+                    tablaEntidad.getNombre(), copia.enOrigen(),
                     AccionReferencial.CASCADA, AccionReferencial.CASCADA));
-            claveCompuesta.addAll(columnasFk);
+            claveCompuesta.addAll(copia.enDestino());
         }
         return claveCompuesta;
     }
@@ -354,17 +392,52 @@ public class Conversor implements IConversor {
      * tabla de origen. Así la restricción foránea queda siempre sincronizada
      * con la columna realmente creada.
      */
-    private List<String> copiarColumnasClave(Restriccion clave, Tabla tablaOrigen, Tabla tablaDestino) {
-        List<String> nombres = new ArrayList<>();
+    private ClaveCopiada copiarColumnasClave(Restriccion clave, Tabla tablaOrigen,
+                                             Tabla tablaDestino, boolean obligatoria) {
+        List<String> enDestino = new ArrayList<>();
+        List<String> enOrigen = new ArrayList<>();
         for (String nombreColumna : clave.getColumnas()) {
             Columna columnaOriginal = tablaOrigen.buscarColumna(nombreColumna);
             String nombreEnDestino = nombreForaneo(tablaOrigen, tablaDestino, nombreColumna);
             if (tablaDestino.buscarColumna(nombreEnDestino) == null) {
-                tablaDestino.agregarColumna(new Columna(nombreEnDestino, columnaOriginal.getTipo(), false));
+                // El tipo base y no el original: una FK hacia un SERIAL es un
+                // entero corriente, no otra secuencia.
+                // Admite nulos si la participacion es parcial: en una relacion
+                // recursiva, el primero de la cadena no tiene con quien
+                // relacionarse y no podria insertarse nunca.
+                tablaDestino.agregarColumna(new Columna(nombreEnDestino,
+                        columnaOriginal.getTipo().getBase(), !obligatoria));
             }
-            nombres.add(nombreEnDestino);
+            enDestino.add(nombreEnDestino);
+            enOrigen.add(nombreColumna);
         }
-        return nombres;
+        return new ClaveCopiada(enDestino, enOrigen);
+    }
+
+    /**
+     * Nombres de las columnas de una clave copiada de una tabla a otra.
+     *
+     * Hacen falta las dos listas: la copia puede haberse renombrado en el
+     * destino para no chocar, y la clave foránea tiene que referenciar el
+     * nombre que la columna tiene en el origen, no el nuevo.
+     */
+    private static final class ClaveCopiada {
+
+        private final List<String> enDestino;
+        private final List<String> enOrigen;
+
+        private ClaveCopiada(List<String> enDestino, List<String> enOrigen) {
+            this.enDestino = enDestino;
+            this.enOrigen = enOrigen;
+        }
+
+        List<String> enDestino() {
+            return enDestino;
+        }
+
+        List<String> enOrigen() {
+            return enOrigen;
+        }
     }
 
     /**

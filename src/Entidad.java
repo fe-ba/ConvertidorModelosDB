@@ -54,8 +54,10 @@ public class Entidad extends ElementoDelModelo {
      */
     @Override
     public List<Atributo> atributosAlmacenables() {
+        // Ni los derivados, que se calculan al consultar, ni los multivaluados,
+        // que se extraen a una tabla propia: ninguno es columna de esta tabla.
         return atributos.stream()
-                .filter(a -> a.getNaturaleza() != Naturaleza.DERIVADO)
+                .filter(a -> a.getNaturaleza() == Naturaleza.SIMPLE)
                 .collect(Collectors.toList());
     }
 
