@@ -149,7 +149,32 @@ public class PruebaConversor {
         roto.agregarTabla(tb);
         debe("detecta la columna referenciada inexistente", !roto.validar().isEmpty());
 
-        System.out.println("=== 11. entidad sin clave ===");
+        System.out.println("=== 11. relacion a medio enlazar ===");
+        m=new ModeloER();
+        Entidad su=ent(m,"Suelta",0,0,false); att(su,"id",TipoDato.SERIAL,Naturaleza.SIMPLE,Marca.CLAVE);
+        Relacion incompleta=rel(m,"Incompleta",0,0,false);
+        une(incompleta,su,Cardinalidad.MUCHOS,Modalidad.PARCIAL);
+        ResultadoConversion parcial=new Conversor().convertir(m);
+        debe("una relacion con una sola participacion avisa", !parcial.getAvisos().isEmpty());
+        debe("y no genera una tabla sin sentido",
+            parcial.getEsquema().buscarTabla("incompleta")==null);
+
+        System.out.println("=== 12. atributos propios de una relacion ===");
+        m=new ModeloER();
+        Entidad al2=ent(m,"Alumno",0,0,false); att(al2,"ida",TipoDato.SERIAL,Naturaleza.SIMPLE,Marca.CLAVE);
+        Entidad ma2=ent(m,"Materia",0,0,false); att(ma2,"idm",TipoDato.SERIAL,Naturaleza.SIMPLE,Marca.CLAVE);
+        Relacion cu=rel(m,"Cursa",0,0,false);
+        une(cu,al2,Cardinalidad.MUCHOS,Modalidad.PARCIAL); une(cu,ma2,Cardinalidad.MUCHOS,Modalidad.PARCIAL);
+        cu.agregarAtributo(new Atributo("nota",TipoDato.DECIMAL,Naturaleza.SIMPLE,
+            EnumSet.noneOf(Marca.class),new Punto(0,-110)));
+        EsquemaRelacional se=new Conversor().convertir(m).getEsquema();
+        Tabla tcu=se.buscarTabla("cursa");
+        debe("el atributo de la relacion llega a la tabla intermedia",
+            tcu!=null && tcu.buscarColumna("nota")!=null);
+        debe("con su tipo", tcu!=null && tcu.buscarColumna("nota").getTipo()==TipoDato.DECIMAL);
+        debe("N:M con atributos: el DDL se ejecuta", sqliteAcepta(se,"nota"));
+
+        System.out.println("=== 13. entidad sin clave ===");
         m=new ModeloER(); Entidad sc=ent(m,"SinClave",0,0,false);
         att(sc,"dato",TipoDato.TEXTO_CORTO,Naturaleza.SIMPLE);
         try { ResultadoConversion rc=new Conversor().convertir(m);

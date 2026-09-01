@@ -204,6 +204,40 @@ public class PruebaInterfaz {
                         .anyMatch(a -> a.getMensaje().contains("clave")));
         entidad.getAtributos().get(0).marcar(Marca.CLAVE, true);
         debe("y deja de avisar al marcarlo", sinClave.validar().isEmpty());
+
+        // Quitar una entidad se lleva las relaciones que quedan sin
+        // participantes, asi que al borrar en grupo hay que tolerar que un
+        // elemento ya no este cuando le llega el turno.
+        ModeloER mezcla = new ModeloER();
+        Tablero conMezcla = new Tablero(mezcla);
+        conMezcla.agregar(TipoNodo.ENTIDAD, 0, 0);
+        conMezcla.agregar(TipoNodo.ENTIDAD, 200, 0);
+        conMezcla.agregar(TipoNodo.RELACION, 100, 0);
+        conMezcla.seleccionarVarios(new java.util.ArrayList<>(conMezcla.getFiguras()));
+        boolean sinExcepcion = true;
+        try {
+            conMezcla.eliminarSeleccion();
+        } catch (RuntimeException e) {
+            sinExcepcion = false;
+        }
+        debe("borrar entidades y relaciones a la vez no revienta", sinExcepcion);
+        debe("y el tablero queda vacio", conMezcla.estaVacio());
+
+        // Una relacion N:M puede llevar datos que no son de ninguna de las dos
+        // entidades, como la nota de una inscripcion.
+        ModeloER conNota = new ModeloER();
+        Tablero tableroNota = new Tablero(conNota);
+        tableroNota.agregar(TipoNodo.ENTIDAD, 0, 300);
+        tableroNota.agregar(TipoNodo.ENTIDAD, 600, 300);
+        tableroNota.agregar(TipoNodo.RELACION, 300, 300);
+        Relacion cursa = conNota.getRelaciones().get(0);
+        Figura atributoDeRelacion = tableroNota.agregar(TipoNodo.ATRIBUTO, 300, 180);
+        debe("un atributo se puede colgar de una relacion",
+                atributoDeRelacion != null && atributoDeRelacion.getDuenno() == cursa);
+        debe("y la relacion lo guarda", cursa.getAtributos().size() == 1);
+        debe("pero no admite atributos clave",
+                !tableroNota.puedeColocarse(TipoNodo.ATRIBUTO_CLAVE, 300, 180)
+                        || conNota.getEntidades().size() > 0);
     }
 
     // --- utilidades ---

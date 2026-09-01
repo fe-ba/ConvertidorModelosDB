@@ -10,10 +10,10 @@ public class Figura {
     private static final int ALTO_ENTIDAD = 56;
 
     private final ElementoDelModelo elemento;
-    // Solo para atributos: la entidad de la que cuelgan.
-    private final Entidad duenno;
+    // Solo para atributos: la entidad o la relacion de la que cuelgan.
+    private final ElementoDelModelo duenno;
 
-    public Figura(ElementoDelModelo elemento, Entidad duenno) {
+    public Figura(ElementoDelModelo elemento, ElementoDelModelo duenno) {
         this.elemento = elemento;
         this.duenno = duenno;
     }
@@ -22,7 +22,7 @@ public class Figura {
         return new Figura(elemento, null);
     }
 
-    public static Figura deAtributo(Atributo atributo, Entidad duenno) {
+    public static Figura deAtributo(Atributo atributo, ElementoDelModelo duenno) {
         return new Figura(atributo, duenno);
     }
 
@@ -30,7 +30,7 @@ public class Figura {
         return elemento;
     }
 
-    public Entidad getDuenno() {
+    public ElementoDelModelo getDuenno() {
         return duenno;
     }
 

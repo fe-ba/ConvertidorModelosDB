@@ -52,6 +52,11 @@ public class Tablero {
                 figuras.add(Figura.deAtributo(atributo, entidad));
             }
         }
+        for (Relacion relacion : modelo.getRelaciones()) {
+            for (Atributo atributo : relacion.getAtributos()) {
+                figuras.add(Figura.deAtributo(atributo, relacion));
+            }
+        }
         return figuras;
     }
 
@@ -71,9 +76,12 @@ public class Tablero {
     public List<Figura> atributosDe(Figura figura) {
         List<Figura> lista = new ArrayList<>();
         if (figura.esEntidad()) {
-            Entidad entidad = (Entidad) figura.getElemento();
-            for (Atributo atributo : entidad.getAtributos()) {
-                lista.add(Figura.deAtributo(atributo, entidad));
+            for (Atributo atributo : ((Entidad) figura.getElemento()).getAtributos()) {
+                lista.add(Figura.deAtributo(atributo, figura.getElemento()));
+            }
+        } else if (figura.esRelacion()) {
+            for (Atributo atributo : ((Relacion) figura.getElemento()).getAtributos()) {
+                lista.add(Figura.deAtributo(atributo, figura.getElemento()));
             }
         }
         return lista;
@@ -144,7 +152,7 @@ public class Tablero {
                 return figura;
             }
             default: {
-                Entidad duenno = entidadMasCercana(x, y);
+                ElementoDelModelo duenno = duennoMasCercano(x, y);
                 if (duenno == null) {
                     return null;
                 }
@@ -155,7 +163,11 @@ public class Tablero {
                 if (tipo == TipoNodo.ATRIBUTO_CLAVE) {
                     atributo.marcar(Marca.CLAVE, true);
                 }
-                duenno.agregarAtributo(atributo);
+                if (duenno instanceof Entidad) {
+                    ((Entidad) duenno).agregarAtributo(atributo);
+                } else {
+                    ((Relacion) duenno).agregarAtributo(atributo);
+                }
                 Figura figura = Figura.deAtributo(atributo, duenno);
                 seleccionarSolo(figura);
                 return figura;
@@ -163,13 +175,16 @@ public class Tablero {
         }
     }
 
-    // Un atributo solo puede colgar de una entidad: el modelo no permite
-    // atributos en las relaciones.
+    // Un atributo cuelga de una entidad o de una relacion, pero no de la nada.
     public boolean puedeColocarse(TipoNodo tipo, int x, int y) {
         if (tipo != TipoNodo.ATRIBUTO && tipo != TipoNodo.ATRIBUTO_CLAVE) {
             return true;
         }
-        return entidadMasCercana(x, y) != null;
+        // una relacion hereda su clave de las entidades: no lleva atributos clave
+        if (tipo == TipoNodo.ATRIBUTO_CLAVE) {
+            return entidadMasCercana(x, y) != null;
+        }
+        return duennoMasCercano(x, y) != null;
     }
 
     // Numeracion por familia, saltando los nombres ya usados.
@@ -210,14 +225,33 @@ public class Tablero {
         avisar();
     }
 
+    // Al borrar en grupo, quitar una entidad puede llevarse por delante la
+    // relacion que quedaba sin participantes: para cuando le toca el turno a
+    // esa relacion, ya no esta. Se comprueba antes de pedir la baja.
     private void eliminarUna(Figura figura) {
-        if (figura.esEntidad()) {
-            modelo.quitarEntidad(figura.getId());
-        } else if (figura.esAtributo()) {
-            figura.getDuenno().quitarAtributo(figura.getNombre());
-        } else {
+        if (figura.esAtributo()) {
+            ElementoDelModelo duenno = figura.getDuenno();
+            if (duenno instanceof Entidad) {
+                ((Entidad) duenno).quitarAtributo(figura.getNombre());
+            } else {
+                ((Relacion) duenno).quitarAtributo(figura.getNombre());
+            }
+        } else if (figura.esEntidad()) {
+            if (existe(modelo.getEntidades(), figura)) {
+                modelo.quitarEntidad(figura.getId());
+            }
+        } else if (existe(modelo.getRelaciones(), figura)) {
             modelo.quitarRelacion(figura.getId());
         }
+    }
+
+    private boolean existe(List<? extends ElementoDelModelo> elementos, Figura figura) {
+        for (ElementoDelModelo elemento : elementos) {
+            if (elemento.getId().equals(figura.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void eliminarSeleccion() {
@@ -358,6 +392,24 @@ public class Tablero {
             }
         }
         return null;
+    }
+
+    // La entidad o la relacion mas cercana, para colgar un atributo.
+    private ElementoDelModelo duennoMasCercano(int x, int y) {
+        ElementoDelModelo mejor = null;
+        double menor = Double.MAX_VALUE;
+        List<ElementoDelModelo> candidatos = new ArrayList<>();
+        candidatos.addAll(modelo.getEntidades());
+        candidatos.addAll(modelo.getRelaciones());
+        for (ElementoDelModelo candidato : candidatos) {
+            double d = Math.hypot(candidato.getPosicion().getX() - x,
+                    candidato.getPosicion().getY() - y);
+            if (d < menor) {
+                menor = d;
+                mejor = candidato;
+            }
+        }
+        return (menor < ALCANCE_ATRIBUTO) ? mejor : null;
     }
 
     private Entidad entidadMasCercana(int x, int y) {

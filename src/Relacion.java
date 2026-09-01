@@ -11,11 +11,13 @@ import java.util.stream.Collectors;
 public class Relacion extends ElementoDelModelo {
 
     private List<Participacion> participaciones;
+    private List<Atributo> atributos;
     private boolean esIdentificadora;
 
     public Relacion(String nombre, Punto posicion, boolean esIdentificadora) {
         super(nombre, posicion);
         this.participaciones = new ArrayList<>();
+        this.atributos = new ArrayList<>();
         this.esIdentificadora = esIdentificadora;
     }
 
@@ -90,10 +92,50 @@ public class Relacion extends ElementoDelModelo {
     }
 
     /**
-     * Una relación no almacena atributos como columnas propias.
+     * Añade un atributo propio de la relación.
+     *
+     * Una relación N:M puede llevar datos que no pertenecen a ninguna de las
+     * dos entidades, como la nota de una inscripción.
+     *
+     * @param atributo atributo a añadir
+     * @throws IllegalArgumentException si ya hay otro con el mismo nombre
+     */
+    public void agregarAtributo(Atributo atributo) {
+        if (atributo == null) {
+            throw new IllegalArgumentException("El atributo no puede ser nulo.");
+        }
+        if (buscarAtributo(atributo.getNombre()) != null) {
+            throw new IllegalArgumentException(
+                    "Ya existe un atributo llamado '" + atributo.getNombre() + "'.");
+        }
+        atributos.add(atributo);
+    }
+
+    public void quitarAtributo(String nombre) {
+        atributos.removeIf(a -> a.getNombre().equals(nombre));
+    }
+
+    public Atributo buscarAtributo(String nombre) {
+        return atributos.stream()
+                .filter(a -> a.getNombre().equals(nombre))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<Atributo> getAtributos() {
+        return Collections.unmodifiableList(atributos);
+    }
+
+    /**
+     * Los atributos que se vuelcan en la tabla que reciba la clave.
+     *
+     * Ni los derivados ni los multivaluados: los primeros se calculan y los
+     * segundos irían a una tabla propia.
      */
     @Override
     public List<Atributo> atributosAlmacenables() {
-        return Collections.emptyList();
+        return atributos.stream()
+                .filter(a -> a.getNaturaleza() == Naturaleza.SIMPLE)
+                .collect(Collectors.toList());
     }
 }

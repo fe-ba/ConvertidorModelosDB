@@ -100,6 +100,13 @@ public class RepositorioJson implements IRepositorio {
           .append(",\n");
         sb.append("      \"posicion\": ").append(punto(relacion.getPosicion()))
           .append(",\n");
+        sb.append("      \"atributos\": [\n");
+        List<Atributo> atributos = relacion.getAtributos();
+        for (int i = 0; i < atributos.size(); i++) {
+            sb.append(atributo(atributos.get(i)));
+            sb.append(i < atributos.size() - 1 ? ",\n" : "\n");
+        }
+        sb.append("      ],\n");
         sb.append("      \"participaciones\": [\n");
         List<Participacion> partes = relacion.getParticipaciones();
         for (int i = 0; i < partes.size(); i++) {
@@ -165,6 +172,9 @@ public class RepositorioJson implements IRepositorio {
                     Json.comoTexto(datos.get("nombre"), "SinNombre"),
                     punto(datos.get("posicion")),
                     Json.comoBooleano(datos.get("esIdentificadora"), false));
+            for (Object crudoAtributo : Json.comoLista(datos.get("atributos"))) {
+                relacion.agregarAtributo(atributo(Json.comoObjeto(crudoAtributo)));
+            }
             for (Object crudoParte : Json.comoLista(datos.get("participaciones"))) {
                 Map<String, Object> parte = Json.comoObjeto(crudoParte);
                 String entidad = porNombre.get(

@@ -145,6 +145,14 @@ public class Conversor implements IConversor {
     }
 
     public void aplicarRegla(ModeloER modelo, Relacion relacion, ResultadoConversion resultado) {
+        // Una relacion suelta o a medio enlazar no describe nada: convertirla
+        // producia una tabla con una sola foranea y sin sentido.
+        if (relacion.grado() < 2) {
+            resultado.advertir(new Aviso(Severidad.ERROR,
+                    "La relación necesita al menos dos participaciones para convertirse.",
+                    relacion.getNombre()));
+            return;
+        }
         TipoRegla regla = firma(relacion);
         switch (regla) {
             case UNO_A_UNO -> reglaUnoAUno(modelo, relacion, resultado);
