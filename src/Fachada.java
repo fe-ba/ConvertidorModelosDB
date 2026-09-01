@@ -7,6 +7,7 @@ public class Fachada {
     private ModeloER modelo;
     private EsquemaRelacional esquema;
     private final IRepositorio repositorio;
+    private final Conversor conversor;
     private String rutaActual;
 
     public Fachada() {
@@ -16,6 +17,7 @@ public class Fachada {
     public Fachada(IRepositorio repositorio) {
         this.modelo = new ModeloER();
         this.repositorio = repositorio;
+        this.conversor = new Conversor();
     }
 
     public ModeloER getModelo() {
@@ -59,10 +61,18 @@ public class Fachada {
 
     // --- Conversion y generacion ---
 
-    // El conversor todavia no esta implementado; cuando lo este, aqui se
-    // guarda el esquema para que lo usen la pestana relacional y la de codigo.
+    // El conversor ya esta operativo: aqui se guarda el esquema para que
+    // lo usen la pestana relacional y la de codigo.
     public boolean hayConversorDisponible() {
-        return false;
+        return true;
+    }
+
+    // Convierte el modelo abierto en el esquema relacional y devuelve los
+    // avisos de la conversion (errores, advertencias e informacion).
+    public List<Aviso> convertir() {
+        ResultadoConversion resultado = conversor.convertir(modelo);
+        esquema = resultado.getEsquema();
+        return resultado.getAvisos();
     }
 
     public String generarCodigo(Destino destino) {

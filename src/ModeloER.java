@@ -88,6 +88,39 @@ public class ModeloER {
         return null;
     }
 
+    /**
+     * Devuelve la entidad que identifica a la entidad débil indicada, o
+     * {@code null} si la débil no está identificada por ninguna relación
+     * identificadora. Se toma como propietaria la otra entidad que participa
+     * en la relación identificadora.
+     */
+    public Entidad propietariaDe(String idEntidadDebil) {
+        for (Relacion relacion : relaciones) {
+            if (!relacion.esIdentificadora() || !relacion.participa(idEntidadDebil)) {
+                continue;
+            }
+            for (Participacion parte : relacion.getParticipaciones()) {
+                String idOtra = parte.getEntidad();
+                if (!idOtra.equals(idEntidadDebil)) {
+                    Entidad propietaria = entidadPorId(idOtra);
+                    if (propietaria != null) {
+                        return propietaria;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private Entidad entidadPorId(String id) {
+        for (Entidad entidad : entidades) {
+            if (entidad.getId().equals(id)) {
+                return entidad;
+            }
+        }
+        return null;
+    }
+
     public List<Entidad> getEntidades() {
         return Collections.unmodifiableList(entidades);
     }

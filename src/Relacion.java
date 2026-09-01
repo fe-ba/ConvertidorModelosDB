@@ -47,6 +47,15 @@ public class Relacion extends ElementoDelModelo {
     }
 
     /**
+     * Cuenta cuántas participaciones tienen la cardinalidad indicada.
+     */
+    public int contar(Cardinalidad cardinalidad) {
+        return (int) participaciones.stream()
+                .filter(p -> p.getCardinalidad() == cardinalidad)
+                .count();
+    }
+
+    /**
      * Indica si la relación es recursiva, es decir, si una misma entidad
      * participa más de una vez en ella.
      */
