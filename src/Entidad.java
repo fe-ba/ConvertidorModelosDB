@@ -52,6 +52,7 @@ public class Entidad extends ElementoDelModelo {
     /**
      * Atributos que pueden almacenarse como columnas (excluye derivados).
      */
+    @Override
     public List<Atributo> atributosAlmacenables() {
         return atributos.stream()
                 .filter(a -> a.getNaturaleza() != Naturaleza.DERIVADO)

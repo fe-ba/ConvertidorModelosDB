@@ -1,5 +1,6 @@
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -88,5 +89,13 @@ public class Atributo extends ElementoDelModelo {
 
     public void setDesplazamiento(Punto desplazamiento) {
         this.desplazamiento = desplazamiento;
+    }
+
+    /**
+     * Un atributo individual no produce columnas almacenables propias.
+     */
+    @Override
+    public List<Atributo> atributosAlmacenables() {
+        return Collections.emptyList();
     }
 }

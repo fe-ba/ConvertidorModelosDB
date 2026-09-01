@@ -1,3 +1,5 @@
+import java.text.Normalizer;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -9,6 +11,13 @@ public abstract class ElementoDelModelo {
     private String id;
     private String nombre;
     private Punto posicion;
+
+    /**
+     * Atributos que pueden almacenarse como columnas. Cada elemento decide
+     * su propia implementación (las entidades filtran derivados, el resto
+     * suele retornar una colección vacía).
+     */
+    public abstract List<Atributo> atributosAlmacenables();
 
     protected ElementoDelModelo(String nombre, Punto posicion) {
         if (posicion == null) {
@@ -40,5 +49,15 @@ public abstract class ElementoDelModelo {
             throw new IllegalArgumentException("La posición del elemento no puede ser nula.");
         }
         this.posicion = posicion;
+    }
+
+    /**
+     * Devuelve el nombre del elemento normalizado: sin acentos, en
+     * minúsculas y con los espacios reemplazados por guiones bajos.
+     */
+    public String nombreNormalizado() {
+        String sinAcentos = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinAcentos.trim().toLowerCase().replaceAll("\\s+", "_");
     }
 }
