@@ -2,43 +2,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Implementación del algoritmo que convierte un {@code ModeloER} en un
- * {@link EsquemaRelacional}.
- *
- * <p><b>El orden de las pasadas es intencional y no debe alterarse:</b></p>
- * <ol>
- *   <li>{@link #convertirEntidades}: crea una tabla por cada entidad (fuerte
- *       o débil). Las fuertes quedan con su clave primaria definida; las
- *       débiles quedan sin clave todavía.</li>
- *   <li>{@link #propagarClavesDebiles}: ya con todas las tablas de entidades
- *       creadas, copia la clave de cada entidad propietaria hacia su(s)
- *       entidad(es) débil(es) y recién ahí define la clave primaria
- *       (compuesta) de la tabla débil.</li>
- *   <li>{@link #convertirRelaciones}: requiere que TODAS las entidades
- *       (fuertes y débiles) ya tengan tabla y clave primaria definitiva, para
- *       poder crear las claves foráneas de las relaciones 1:1, 1:N, N:M y
- *       N-arias.</li>
- *   <li>{@link #extraerMultivaluados}: requiere que la entidad dueña del
- *       atributo multivaluado ya tenga su clave definitiva, para poder
- *       referenciarla desde la nueva tabla del atributo.</li>
- * </ol>
- *
- * <p>Si se cambia este orden, las entidades débiles se quedan sin clave:
- * su clave primaria depende de la clave, ya definida, de su entidad
- * propietaria, y las relaciones/atributos multivaluados dependen a su vez de
- * que esa clave ya esté completa.</p>
- *
- * <p><b>Nota sobre dependencias externas:</b> {@code ModeloER}, {@code Entidad},
- * {@code Relacion}, {@code Participacion}, {@code Atributo},
- * {@code ElementoDelModelo}, {@code Cardinalidad}, {@code Modalidad} y
- * {@code Aviso} son clases de otros miembros del equipo. Esta clase asume la
- * API pública que se ve en el diagrama, incluyendo un par de getters de
- * {@code Atributo} ({@code getNombre()}, {@code getTipo()}) que no se alcanzan
- * a ver completos en el diagrama pero que son necesarios para poder crear las
- * columnas. Si el nombre real de esos métodos difiere, solo hay que ajustar
- * las llamadas correspondientes aquí.</p>
- */
+
 public class Conversor implements IConversor {
 
     @Override
