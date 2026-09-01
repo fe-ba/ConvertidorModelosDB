@@ -346,17 +346,49 @@ public class Conversor implements IConversor {
      * Copia (si aún no existen) las columnas de {@code clave} desde
      * {@code tablaOrigen} hacia {@code tablaDestino}, y devuelve los nombres
      * resultantes en el mismo orden.
+     *
+     * El nombre que se utiliza en el destino se calcula antes de crear la
+     * columna por {@link #nombreForaneo}: si el nombre ya está ocupado en el
+     * destino (por ejemplo, cuando dos entidades participantes tienen una
+     * clave con el mismo nombre), se desambigua añadiendo el nombre de la
+     * tabla de origen. Así la restricción foránea queda siempre sincronizada
+     * con la columna realmente creada.
      */
     private List<String> copiarColumnasClave(Restriccion clave, Tabla tablaOrigen, Tabla tablaDestino) {
         List<String> nombres = new ArrayList<>();
         for (String nombreColumna : clave.getColumnas()) {
             Columna columnaOriginal = tablaOrigen.buscarColumna(nombreColumna);
-            if (tablaDestino.buscarColumna(nombreColumna) == null) {
-                tablaDestino.agregarColumna(new Columna(columnaOriginal.getNombre(), columnaOriginal.getTipo(), false));
+            String nombreEnDestino = nombreForaneo(tablaOrigen, tablaDestino, nombreColumna);
+            if (tablaDestino.buscarColumna(nombreEnDestino) == null) {
+                tablaDestino.agregarColumna(new Columna(nombreEnDestino, columnaOriginal.getTipo(), false));
             }
-            nombres.add(nombreColumna);
+            nombres.add(nombreEnDestino);
         }
         return nombres;
+    }
+
+    /**
+     * Devuelve un nombre único para la columna {@code nombre} que se va a
+     * copiar de {@code tablaOrigen} hacia {@code tablaDestino}. Si el nombre
+     * ya está ocupado en el destino, se prefija con el nombre de la tabla de
+     * origen; si aun así choca, se añade un sufijo numérico hasta encontrar
+     * uno libre.
+     */
+    private String nombreForaneo(Tabla tablaOrigen, Tabla tablaDestino, String nombre) {
+        if (tablaDestino.buscarColumna(nombre) == null) {
+            return nombre;
+        }
+        String basеPrefijado = tablaOrigen.getNombre() + "_" + nombre;
+        if (tablaDestino.buscarColumna(basеPrefijado) == null) {
+            return basеPrefijado;
+        }
+        int i = 2;
+        String candidato;
+        do {
+            candidato = basеPrefijado + "_" + i;
+            i++;
+        } while (tablaDestino.buscarColumna(candidato) != null);
+        return candidato;
     }
 
     private void agregarAtributosDeRelacion(Relacion relacion, Tabla tabla) {
