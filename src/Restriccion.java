@@ -11,7 +11,32 @@ public class Restriccion {
     private AccionReferencial alActualizar;
     private AccionReferencial alBorrar;
 
-    public Restriccion(TipoRestriccion tipo, List<String> columnas, String tablaReferida,
+    // ---------------------------------------------------------------
+    // Métodos de fábrica: la única forma externa de crear restricciones.
+    // ---------------------------------------------------------------
+
+    /**
+     * Crea una restricción de clave primaria o única.
+     * No recibe acciones referenciales (no aplican a PK/UNIQUE).
+     */
+    public static Restriccion clave(TipoRestriccion tipo, List<String> columnas) {
+        return new Restriccion(tipo, columnas, null, null, null, null);
+    }
+
+    /**
+     * Crea una restricción de clave foránea.
+     * Los parámetros de acción están nombrados: no hay forma de intercambiarlos
+     * por accidente al invocar este método.
+     */
+    public static Restriccion foranea(List<String> columnas, String tablaReferida,
+                                      List<String> columnasReferidas,
+                                      AccionReferencial alActualizar,
+                                      AccionReferencial alBorrar) {
+        return new Restriccion(TipoRestriccion.FORANEA, columnas, tablaReferida,
+                columnasReferidas, alActualizar, alBorrar);
+    }
+
+    private Restriccion(TipoRestriccion tipo, List<String> columnas, String tablaReferida,
                         List<String> columnasReferidas, AccionReferencial alActualizar,
                         AccionReferencial alBorrar) {
         if (tipo == null) {

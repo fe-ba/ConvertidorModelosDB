@@ -33,15 +33,14 @@ public class PruebaGeneracion {
         profesor.agregarColumna(new Columna("nombre", TipoDato.TEXTO_MEDIO, false));
         profesor.agregarColumna(new Columna("email", TipoDato.TEXTO_MEDIO, true));
         profesor.definirClave(Arrays.asList("id_profesor"));
-        profesor.restringir(new Restriccion(TipoRestriccion.UNICA, Arrays.asList("email"),
-                null, null, AccionReferencial.NINGUNA, AccionReferencial.NINGUNA));
+        profesor.restringir(Restriccion.clave(TipoRestriccion.UNICA, Arrays.asList("email")));
         e.agregarTabla(profesor);
 
         Tabla familiar = new Tabla("Familiar", OrigenTabla.ENTIDAD_DEBIL, "e2");
         familiar.agregarColumna(new Columna("nombre", TipoDato.TEXTO_MEDIO, false));
         familiar.agregarColumna(new Columna("profesor_id_profesor", TipoDato.ENTERO, false));
         familiar.definirClave(Arrays.asList("nombre", "profesor_id_profesor"));
-        familiar.restringir(new Restriccion(TipoRestriccion.FORANEA,
+        familiar.restringir(Restriccion.foranea(
                 Arrays.asList("profesor_id_profesor"), "Profesor",
                 Arrays.asList("id_profesor"),
                 AccionReferencial.CASCADA, AccionReferencial.CASCADA));
@@ -58,11 +57,11 @@ public class PruebaGeneracion {
         inscribe.agregarColumna(new Columna("curso_id_curso", TipoDato.ENTERO, false));
         inscribe.agregarColumna(new Columna("nota", TipoDato.DECIMAL, true));
         inscribe.definirClave(Arrays.asList("profesor_id_profesor", "curso_id_curso"));
-        inscribe.restringir(new Restriccion(TipoRestriccion.FORANEA,
+        inscribe.restringir(Restriccion.foranea(
                 Arrays.asList("profesor_id_profesor"), "Profesor",
                 Arrays.asList("id_profesor"), AccionReferencial.RESTRINGIR,
                 AccionReferencial.CASCADA));
-        inscribe.restringir(new Restriccion(TipoRestriccion.FORANEA,
+        inscribe.restringir(Restriccion.foranea(
                 Arrays.asList("curso_id_curso"), "Curso", Arrays.asList("id_curso"),
                 AccionReferencial.RESTRINGIR, AccionReferencial.CASCADA));
         e.agregarTabla(inscribe);
@@ -168,8 +167,8 @@ public class PruebaGeneracion {
         horario.agregarColumna(new Columna("aula", TipoDato.TEXTO_CORTO, false));
         horario.agregarColumna(new Columna("hora", TipoDato.FECHA_HORA, false));
         horario.definirClave(Arrays.asList("id"));
-        horario.restringir(new Restriccion(TipoRestriccion.UNICA,
-                Arrays.asList("aula", "hora"), null, null, null, null));
+        horario.restringir(Restriccion.clave(TipoRestriccion.UNICA,
+                Arrays.asList("aula", "hora")));
         e.agregarTabla(horario);
 
         String sql = new GeneradorSQL(Destino.POSTGRESQL).generar(e);
@@ -197,7 +196,7 @@ public class PruebaGeneracion {
         Tabla hija = new Tabla("Hija", OrigenTabla.ENTIDAD_FUERTE, null);
         hija.agregarColumna(new Columna("padre_id", TipoDato.ENTERO, false));
         hija.definirClave(Arrays.asList("padre_id"));
-        hija.restringir(new Restriccion(TipoRestriccion.FORANEA, Arrays.asList("padre_id"),
+        hija.restringir(Restriccion.foranea(Arrays.asList("padre_id"),
                 "Tabla Ausente", Arrays.asList("id"),
                 AccionReferencial.CASCADA, AccionReferencial.CASCADA));
         rota.agregarTabla(hija);
