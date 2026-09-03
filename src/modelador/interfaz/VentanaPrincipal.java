@@ -3,6 +3,7 @@ package modelador.interfaz;
 import java.awt.BorderLayout;
 import java.io.File;
 import java.util.List;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -33,6 +34,7 @@ public class VentanaPrincipal extends JFrame {
     private final LienzoRelacional lienzoRelacional;
     private final VistaCodigo vistaCodigo;
     private JComboBox<Destino> destinos;
+    private VistaTraza vistaTraza;
     private JTabbedPane pestanas;
 
     public VentanaPrincipal() {
@@ -40,6 +42,7 @@ public class VentanaPrincipal extends JFrame {
         this.fachada = new Fachada();
         this.lienzoRelacional = new LienzoRelacional();
         this.vistaCodigo = new VistaCodigo();
+        this.vistaTraza = new VistaTraza();
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1240, 780);
@@ -52,6 +55,7 @@ public class VentanaPrincipal extends JFrame {
         pestanas.addTab("Diagrama E-R", paginaER);
         pestanas.addTab("Diagrama relacional", lienzoRelacional);
         pestanas.addTab("Codigo", montarPaginaCodigo());
+        pestanas.addTab("Traza", vistaTraza);
         pestanas.addChangeListener(this::alCambiarPestana);
         add(pestanas, BorderLayout.CENTER);
     }
@@ -72,8 +76,15 @@ public class VentanaPrincipal extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         destinos = new JComboBox<>(Destino.values());
         destinos.addActionListener(e -> generarCodigo());
+        JButton exportar = new JButton("Exportar...");
+        exportar.setToolTipText("Guarda el codigo generado en un archivo");
+        exportar.addActionListener(e -> exportarCodigo());
+        JPanel controles = new JPanel(new java.awt.FlowLayout(
+                java.awt.FlowLayout.LEFT, 8, 6));
+        controles.add(destinos);
+        controles.add(exportar);
         JPanel superior = new JPanel(new BorderLayout());
-        superior.add(destinos, BorderLayout.WEST);
+        superior.add(controles, BorderLayout.WEST);
         panel.add(superior, BorderLayout.NORTH);
         panel.add(new JScrollPane(vistaCodigo), BorderLayout.CENTER);
         return panel;
@@ -150,6 +161,37 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
+    // Exportar es generar y ademas escribir el archivo, con la extension que
+    // corresponda al destino elegido.
+    private void exportarCodigo() {
+        Destino destino = (Destino) destinos.getSelectedItem();
+        if (fachada.getEsquema() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Primero convierte el diagrama E-R (F9).",
+                    "Todavia no hay codigo", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        JFileChooser dialogo = new JFileChooser();
+        dialogo.setSelectedFile(new File(fachada.nombreDeArchivo(destino)));
+        if (dialogo.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        String ruta = dialogo.getSelectedFile().getAbsolutePath();
+        String extension = "." + destino.getExtension();
+        if (!ruta.endsWith(extension)) {
+            ruta = ruta + extension;
+        }
+        try {
+            fachada.exportarCodigo(destino, ruta);
+            JOptionPane.showMessageDialog(this, "Codigo exportado a\n" + ruta,
+                    "Exportado", JOptionPane.INFORMATION_MESSAGE);
+        } catch (RuntimeException e) {
+            JOptionPane.showMessageDialog(this,
+                    "No se pudo exportar.\n" + e.getMessage(),
+                    "Error al exportar", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void validar() {
         List<Aviso> avisos = fachada.validar();
         if (avisos.isEmpty()) {
@@ -171,6 +213,7 @@ public class VentanaPrincipal extends JFrame {
         List<Aviso> avisos = fachada.convertir();
         lienzoRelacional.setModelo(fachada.getModelo());
         lienzoRelacional.mostrar(fachada.getEsquema());
+        vistaTraza.mostrar(fachada.getTraza(), avisos);
         generarCodigo();
 
         List<Aviso> errores = new java.util.ArrayList<>();
@@ -202,6 +245,7 @@ public class VentanaPrincipal extends JFrame {
         } else {
             lienzoRelacional.setModelo(fachada.getModelo());
         lienzoRelacional.mostrar(fachada.getEsquema());
+        vistaTraza.mostrar(fachada.getTraza(), avisos);
         }
     }
 

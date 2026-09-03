@@ -3,6 +3,7 @@ package modelador.aplicacion;
 import java.util.List;
 import modelador.conversion.Conversor;
 import modelador.conversion.ResultadoConversion;
+import modelador.conversion.Traza;
 import modelador.dominio.er.ModeloER;
 import modelador.dominio.relacional.EsquemaRelacional;
 import modelador.dominio.tipos.Aviso;
@@ -17,6 +18,8 @@ public class Fachada {
 
     private ModeloER modelo;
     private EsquemaRelacional esquema;
+    // Se guarda entero: la traza explica por que el esquema salio asi.
+    private ResultadoConversion resultado;
     private final IRepositorio repositorio;
     private final Conversor conversor;
     private String rutaActual;
@@ -50,6 +53,7 @@ public class Fachada {
     public void nuevo() {
         modelo = new ModeloER();
         esquema = null;
+        resultado = null;
         rutaActual = null;
     }
 
@@ -63,6 +67,7 @@ public class Fachada {
     public void abrir(String ruta) {
         modelo = repositorio.cargar(ruta);
         esquema = null;
+        resultado = null;
         rutaActual = ruta;
     }
 
@@ -81,7 +86,7 @@ public class Fachada {
     // Convierte el modelo abierto en el esquema relacional y devuelve los
     // avisos de la conversion (errores, advertencias e informacion).
     public List<Aviso> convertir() {
-        ResultadoConversion resultado = conversor.convertir(modelo);
+        resultado = conversor.convertir(modelo);
         esquema = resultado.getEsquema();
         return resultado.getAvisos();
     }
@@ -92,6 +97,22 @@ public class Fachada {
                     "Todavia no hay esquema: primero hay que convertir el modelo.");
         }
         return CatalogoGeneradores.para(destino).generar(esquema);
+    }
+
+    /** Explicación de qué regla se aplicó a cada elemento en la conversión. */
+    public List<Traza> getTraza() {
+        return (resultado == null) ? List.of() : resultado.getTraza();
+    }
+
+    /** Escribe en disco el código del destino indicado. */
+    public void exportarCodigo(Destino destino, String ruta) {
+        String codigo = generarCodigo(destino);
+        try {
+            java.nio.file.Files.writeString(java.nio.file.Path.of(ruta), codigo,
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException("No se pudo exportar a " + ruta, e);
+        }
     }
 
     public String nombreDeArchivo(Destino destino) {

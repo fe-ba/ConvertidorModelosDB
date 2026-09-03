@@ -40,6 +40,7 @@ public class PruebaInterfaz {
         probarPersistencia();
         probarFachada();
         probarModeloER();
+        probarTrazaYExportacion();
         System.out.println(fallos == 0 ? "\nTODO CORRECTO" : "\n" + fallos + " FALLOS");
         System.exit(fallos);
     }
@@ -259,6 +260,54 @@ public class PruebaInterfaz {
         debe("pero no admite atributos clave",
                 !tableroNota.puedeColocarse(TipoNodo.ATRIBUTO_CLAVE, 300, 180)
                         || conNota.getEntidades().size() > 0);
+    }
+
+    // La traza explica por que el esquema salio asi, y la exportacion escribe
+    // el codigo en disco con la extension del destino.
+    private static void probarTrazaYExportacion() throws Exception {
+        System.out.println("\n--- Traza y exportacion ---");
+        Fachada fachada = new Fachada();
+        Tablero tablero = new Tablero(fachada.getModelo());
+        tablero.agregar(TipoNodo.ENTIDAD, 0, 300);
+        tablero.agregar(TipoNodo.ENTIDAD, 600, 300);
+        tablero.agregar(TipoNodo.RELACION, 300, 300);
+        ModeloER modelo = fachada.getModelo();
+        Entidad alumno = modelo.getEntidades().get(0);
+        Entidad materia = modelo.getEntidades().get(1);
+        alumno.agregarAtributo(new Atributo("ida", TipoDato.SERIAL, Naturaleza.SIMPLE,
+                java.util.EnumSet.of(Marca.CLAVE), new Punto(0, -110)));
+        materia.agregarAtributo(new Atributo("idm", TipoDato.SERIAL, Naturaleza.SIMPLE,
+                java.util.EnumSet.of(Marca.CLAVE), new Punto(0, -110)));
+        Relacion cursa = modelo.getRelaciones().get(0);
+        tablero.enlazar(Figura.de(cursa), Figura.de(alumno));
+        tablero.enlazar(Figura.de(cursa), Figura.de(materia));
+
+        debe("sin convertir no hay traza", fachada.getTraza().isEmpty());
+        fachada.convertir();
+        debe("tras convertir hay traza", !fachada.getTraza().isEmpty());
+        debe("cada paso lleva su explicacion",
+                fachada.getTraza().stream()
+                        .allMatch(p -> p.getExplicacion() != null
+                                && !p.getExplicacion().isBlank()));
+
+        boolean exportados = true;
+        for (Destino destino : Destino.values()) {
+            String ruta = "/tmp/prueba_exp." + destino.getExtension();
+            fachada.exportarCodigo(destino, ruta);
+            if (java.nio.file.Files.size(java.nio.file.Path.of(ruta)) < 50) {
+                exportados = false;
+            }
+        }
+        debe("los seis destinos se exportan a archivo", exportados);
+
+        fachada.nuevo();
+        debe("empezar de cero descarta la traza", fachada.getTraza().isEmpty());
+        try {
+            fachada.exportarCodigo(Destino.SQLITE, "/tmp/prueba_no.sql");
+            debe("exportar sin esquema avisa", false);
+        } catch (IllegalStateException e) {
+            debe("exportar sin esquema avisa", true);
+        }
     }
 
     // --- utilidades ---
